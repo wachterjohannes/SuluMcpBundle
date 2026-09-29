@@ -16,8 +16,7 @@ namespace Sulu\Mcp\Infrastructure\Sulu\AdminLink;
 use Sulu\Bundle\AdminBundle\Admin\View\ViewRegistry;
 
 /**
- * Usable by any AdminLinkProviderInterface implementation for reading its context array
- * and resolving admin view paths.
+ * @internal
  */
 trait AdminLinkContextTrait
 {

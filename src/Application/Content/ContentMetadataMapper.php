@@ -25,8 +25,7 @@ use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderInterface;
  * a metadata field name with a `/` (e.g. `seo/title`) nests under that namespace;
  * a name without (e.g. `seoNoIndex`, `excerptCategories`) is a top-level column.
  *
- * Usable by a bundle implementing ContentTypeExtensionInterface, whose own tools carry
- * the same excerpt/seo fields.
+ * @internal
  */
 final readonly class ContentMetadataMapper
 {

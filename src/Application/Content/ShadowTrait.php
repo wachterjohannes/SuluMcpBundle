@@ -17,8 +17,7 @@ namespace Sulu\Mcp\Application\Content;
  * Shared handling of the "Shadow" setting, which makes one localisation serve another's
  * content instead of maintaining its own.
  *
- * Usable by a bundle implementing ContentTypeExtensionInterface, whose own tools support
- * the same setting.
+ * @internal
  */
 trait ShadowTrait
 {

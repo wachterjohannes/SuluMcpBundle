@@ -21,8 +21,7 @@ use Sulu\Bundle\AdminBundle\Application\BlockIdGenerator\BlockIdGeneratorInterfa
  * AI clients (Claude, ChatGPT) sometimes send block data as a list [{"key": "value"}]
  * instead of a flat object {"key": "value"}. This trait provides normalization methods.
  *
- * Usable by a bundle implementing ContentTypeExtensionInterface, whose own block-bearing
- * tools need the same normalization.
+ * @internal
  */
 trait BlockDataNormalizerTrait
 {

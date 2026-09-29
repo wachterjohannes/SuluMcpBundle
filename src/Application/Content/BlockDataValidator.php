@@ -32,8 +32,7 @@ use Sulu\Mcp\Application\Metadata\MetadataLocaleResolver;
  * (block property, block type) steps down from the template form instead of
  * searching the metadata for a matching name.
  *
- * Usable by a bundle implementing ContentTypeExtensionInterface, whose own block-bearing
- * tools need the same validation.
+ * @internal
  */
 final readonly class BlockDataValidator
 {
