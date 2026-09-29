@@ -22,9 +22,11 @@ use Sulu\Content\Application\ContentManager\ContentManagerInterface;
 use Sulu\Content\Domain\Model\ContentRichEntityInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
+use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\FakeContentTypeExtension;
 use Sulu\Page\Domain\Model\Page;
 
 #[CoversClass(ContentSecurityContextResolver::class)]
@@ -58,6 +60,7 @@ final class ContentSecurityContextResolverTest extends TestCase
         $resolver = new ContentSecurityContextResolver(
             new ArticleSecurityContextResolver($groupProvider),
             $this->prophesize(ContentManagerInterface::class)->reveal(),
+            new ContentTypeExtensionRegistry([]),
         );
 
         $dimensionContent = $this->prophesize(TemplateInterface::class);
@@ -85,6 +88,20 @@ final class ContentSecurityContextResolverTest extends TestCase
         $resolver = $this->resolver();
 
         self::assertSame('', $resolver->forEntity('unknown', new \stdClass()));
+    }
+
+    public function testForEntityDelegatesToARegisteredExtension(): void
+    {
+        $groupProvider = new TestGroupProvider([
+            (new FormGroup('default', 'Default'))->withTemplate('default'),
+        ]);
+        $resolver = new ContentSecurityContextResolver(
+            new ArticleSecurityContextResolver($groupProvider),
+            $this->prophesize(ContentManagerInterface::class)->reveal(),
+            new ContentTypeExtensionRegistry([new FakeContentTypeExtension()]),
+        );
+
+        self::assertSame('sulu.widget.widgets', $resolver->forEntity('widget', new \stdClass()));
     }
 
     public function testForEntityInLocaleResolvesArticleGroupFromTheGhostSourceLocale(): void
@@ -175,6 +192,7 @@ final class ContentSecurityContextResolverTest extends TestCase
         return new ContentSecurityContextResolver(
             new ArticleSecurityContextResolver($groupProvider),
             $this->prophesize(ContentManagerInterface::class)->reveal(),
+            new ContentTypeExtensionRegistry([]),
         );
     }
 
@@ -185,6 +203,6 @@ final class ContentSecurityContextResolverTest extends TestCase
             (new FormGroup('blog', 'Blog'))->withTemplate('blog_article'),
         ]);
 
-        return new ContentSecurityContextResolver(new ArticleSecurityContextResolver($groupProvider), $contentManager);
+        return new ContentSecurityContextResolver(new ArticleSecurityContextResolver($groupProvider), $contentManager, new ContentTypeExtensionRegistry([]));
     }
 }

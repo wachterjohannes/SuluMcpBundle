@@ -20,6 +20,7 @@ use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Content\Application\ContentManager\ContentManagerInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
+use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Application\Security\PageDescendantPermissionChecker;
@@ -60,7 +61,7 @@ class ContentDeleteTool
     #[McpTool(
         name: 'sulu_content_delete',
         title: 'Delete Content',
-        description: 'Permanently delete a page, article, or snippet by UUID. Set "type" to "page", "article", "snippet", or "product" when SuluProductBundle is installed. Removes both draft and published versions — this cannot be undone. For pages with children, set forceRemoveChildren=true to delete the whole subtree (ignored for articles/snippets). Deleting a product of type "product_with_variants" also deletes every variant under it — there is no separate confirmation flag for that, so check sulu_product_variant_list first. Snippets may be referenced by other content; deleting one removes that shared content everywhere it is used.',
+        description: 'Permanently delete a page, article, snippet, or any type a bundle registers, by UUID. Set "type" to "page", "article", "snippet", or another registered type. Removes both draft and published versions — this cannot be undone. For pages with children, set forceRemoveChildren=true to delete the whole subtree (ignored for articles/snippets). Snippets may be referenced by other content; deleting one removes that shared content everywhere it is used. A registered type may cascade the deletion to related entities; check that type\'s own list tool first if unsure.',
         annotations: new ToolAnnotations(readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false),
     )]
     #[DangerousTool('delete')]
@@ -70,7 +71,7 @@ class ContentDeleteTool
             new PermissionRequirement('#context#', PermissionTypes::DELETE),
         ],
         objectResolved: true,
-        discoveryContexts: ['sulu.snippet.snippets', 'sulu.product.products', ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT, WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT],
+        discoveryContexts: ['sulu.snippet.snippets', ContentTypeExtensionRegistry::ANY_EXTENSION_CONTEXT, ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT, WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT],
     )]
     public function deleteContent(
         string $type,

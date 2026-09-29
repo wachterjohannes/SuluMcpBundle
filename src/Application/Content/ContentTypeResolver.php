@@ -23,10 +23,6 @@ use Sulu\Page\Application\Message\ApplyWorkflowTransitionPageMessage;
 use Sulu\Page\Application\Message\ModifyPageMessage;
 use Sulu\Page\Application\Message\RemovePageMessage;
 use Sulu\Page\Domain\Repository\PageRepositoryInterface;
-use Sulu\Product\Application\Message\ApplyWorkflowTransitionProductMessage;
-use Sulu\Product\Application\Message\ModifyProductMessage;
-use Sulu\Product\Application\Message\RemoveProductMessage;
-use Sulu\Product\Domain\Repository\ProductRepositoryInterface;
 use Sulu\Snippet\Application\Message\ApplyWorkflowTransitionSnippetMessage;
 use Sulu\Snippet\Application\Message\ModifySnippetMessage;
 use Sulu\Snippet\Application\Message\RemoveSnippetMessage;
@@ -35,7 +31,8 @@ use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 /**
  * Resolves the content-type-specific parts of block operations — loading the
  * draft entity and building the right modify message — so block tools can be
- * written once and dispatch over page / article / snippet via a `type` string.
+ * written once and dispatch over page / article / snippet / any registered
+ * {@see ContentTypeExtensionRegistry} type via a `type` string.
  *
  * Everything else (content resolve/normalize, block-tree manipulation) is already
  * type-agnostic and stays in the tools.
@@ -49,13 +46,11 @@ final readonly class ContentTypeResolver
      */
     private const SUPPORTED_TYPES = ['page', 'article', 'snippet'];
 
-    private const PRODUCT_TYPE = 'product';
-
     public function __construct(
         private PageRepositoryInterface $pageRepository,
         private ArticleRepositoryInterface $articleRepository,
         private SnippetRepositoryInterface $snippetRepository,
-        private ?ProductRepositoryInterface $productRepository = null,
+        private ContentTypeExtensionRegistry $extensionRegistry,
     ) {
     }
 
@@ -69,11 +64,7 @@ final readonly class ContentTypeResolver
      */
     public function supportedTypes(): array
     {
-        if (null === $this->productRepository) {
-            return self::SUPPORTED_TYPES;
-        }
-
-        return [...self::SUPPORTED_TYPES, self::PRODUCT_TYPE];
+        return [...self::SUPPORTED_TYPES, ...$this->extensionRegistry->types()];
     }
 
     /**
@@ -98,8 +89,7 @@ final readonly class ContentTypeResolver
                 'page' => $this->pageRepository->getOneBy($filters, [PageRepositoryInterface::GROUP_SELECT_PAGE_ADMIN => true]),
                 'article' => $this->articleRepository->getOneBy($filters, [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_ADMIN => true]),
                 'snippet' => $this->snippetRepository->getOneBy($filters, [SnippetRepositoryInterface::GROUP_SELECT_SNIPPET_ADMIN => true]),
-                self::PRODUCT_TYPE => $this->productRepository?->getOneBy($filters, [ProductRepositoryInterface::GROUP_SELECT_PRODUCT_ADMIN => true]),
-                default => null,
+                default => $this->extensionRegistry->has($type) ? $this->extensionRegistry->get($type)->loadDraft($uuid, $locale, $loadGhost) : null,
             };
         } catch (\Throwable) {
             return null;
@@ -132,8 +122,7 @@ final readonly class ContentTypeResolver
                 'page' => $this->pageRepository->getOneBy($filters, [PageRepositoryInterface::SELECT_PAGE_CONTENT => $contentSelect]),
                 'article' => $this->articleRepository->getOneBy($filters, [ArticleRepositoryInterface::SELECT_ARTICLE_CONTENT => $contentSelect]),
                 'snippet' => $this->snippetRepository->getOneBy($filters, [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => $contentSelect]),
-                self::PRODUCT_TYPE => $this->productRepository?->getOneBy($filters, [ProductRepositoryInterface::SELECT_PRODUCT_CONTENT => $contentSelect]),
-                default => null,
+                default => $this->extensionRegistry->has($type) ? $this->extensionRegistry->get($type)->loadForTransition($uuid, $locale) : null,
             };
         } catch (\Throwable) {
             return null;
@@ -151,8 +140,7 @@ final readonly class ContentTypeResolver
             'page' => new ModifyPageMessage(['uuid' => $uuid], $data),
             'article' => new ModifyArticleMessage(['uuid' => $uuid], $data),
             'snippet' => new ModifySnippetMessage(['uuid' => $uuid], $data),
-            self::PRODUCT_TYPE => new ModifyProductMessage(['uuid' => $uuid], $data), // @phpstan-ignore argument.type (message shape is validated by its own handler)
-            default => throw new \LogicException('Unreachable: assertSupported() rejects every other type.'),
+            default => $this->extensionRegistry->get($type)->createModifyMessage($uuid, $data),
         };
     }
 
@@ -168,8 +156,7 @@ final readonly class ContentTypeResolver
             'page' => new RemovePageMessage(['uuid' => $uuid], $locale, $forceRemoveChildren),
             'article' => new RemoveArticleMessage(['uuid' => $uuid], $locale),
             'snippet' => new RemoveSnippetMessage(['uuid' => $uuid], $locale),
-            self::PRODUCT_TYPE => new RemoveProductMessage(['uuid' => $uuid], $locale),
-            default => throw new \LogicException('Unreachable: assertSupported() rejects every other type.'),
+            default => $this->extensionRegistry->get($type)->createRemoveMessage($uuid, $locale, $forceRemoveChildren),
         };
     }
 
@@ -184,14 +171,13 @@ final readonly class ContentTypeResolver
             'page' => new ApplyWorkflowTransitionPageMessage(['uuid' => $uuid], $locale, $transition),
             'article' => new ApplyWorkflowTransitionArticleMessage(['uuid' => $uuid], $locale, $transition),
             'snippet' => new ApplyWorkflowTransitionSnippetMessage(['uuid' => $uuid], $locale, $transition),
-            self::PRODUCT_TYPE => new ApplyWorkflowTransitionProductMessage(['uuid' => $uuid], $locale, $transition),
-            default => throw new \LogicException('Unreachable: assertSupported() rejects every other type.'),
+            default => $this->extensionRegistry->get($type)->createTransitionMessage($uuid, $locale, $transition),
         };
     }
 
     /**
-     * Checked against the live list, not the match arms below: those would otherwise build a
-     * product message when SuluProductBundle is not installed.
+     * Checked against the live list, not the match arms below: those would otherwise
+     * delegate to an extension that is not registered.
      */
     private function assertSupported(string $type): void
     {

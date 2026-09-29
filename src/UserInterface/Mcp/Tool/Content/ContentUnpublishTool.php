@@ -20,6 +20,7 @@ use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Content\Application\ContentManager\ContentManagerInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
+use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
@@ -58,7 +59,7 @@ class ContentUnpublishTool
     #[McpTool(
         name: 'sulu_content_unpublish',
         title: 'Unpublish Content',
-        description: 'Unpublish a live page, article, or snippet — removes it from the website but keeps the draft. Set "type" to "page", "article", "snippet", or "product" when SuluProductBundle is installed. Unpublishing a product also unpublishes its variants in that locale. The content is preserved and can be re-published later with sulu_content_publish. Use this to take content offline without deleting it.',
+        description: 'Unpublish a live page, article, snippet, or any type a bundle registers — removes it from the website but keeps the draft. Set "type" to "page", "article", "snippet", or another registered type. A registered type may cascade the unpublish to related entities; check that type\'s own tools if unsure. The content is preserved and can be re-published later with sulu_content_publish. Use this to take content offline without deleting it.',
         annotations: new ToolAnnotations(readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false),
     )]
     #[DangerousTool('publish')]
@@ -68,7 +69,7 @@ class ContentUnpublishTool
             new PermissionRequirement('#context#', PermissionTypes::LIVE),
         ],
         objectResolved: true,
-        discoveryContexts: ['sulu.snippet.snippets', 'sulu.product.products', ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT, WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT],
+        discoveryContexts: ['sulu.snippet.snippets', ContentTypeExtensionRegistry::ANY_EXTENSION_CONTEXT, ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT, WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT],
     )]
     public function unpublishContent(string $type, string $uuid, string $locale): array
     {

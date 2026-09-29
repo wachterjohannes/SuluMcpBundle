@@ -17,6 +17,7 @@ use Sulu\Content\Application\ContentManager\ContentManagerInterface;
 use Sulu\Content\Domain\Model\ContentRichEntityInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
+use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Page\Domain\Model\PageInterface;
 
@@ -24,11 +25,8 @@ use Sulu\Page\Domain\Model\PageInterface;
  * Per-type security context for a loaded content entity:
  * page → sulu.webspaces.<key> (from the aggregate), article → per-group (from the
  * RESOLVED dimension content's template key — NOT the aggregate),
- * snippet → sulu.snippet.snippets, product → sulu.product.products.
- *
- * The product context is spelled out here and in the unified tools' discoveryContexts rather
- * than taken from ProductAdmin::SECURITY_CONTEXT, because those files are loaded whether or
- * not SuluProductBundle is installed. The product tools themselves do use the constant.
+ * snippet → sulu.snippet.snippets, any other registered type → its extension's
+ * security context.
  *
  * @internal
  */
@@ -37,11 +35,12 @@ final readonly class ContentSecurityContextResolver
     public function __construct(
         private ArticleSecurityContextResolver $articleContextResolver,
         private ContentManagerInterface $contentManager,
+        private ContentTypeExtensionRegistry $extensionRegistry,
     ) {
     }
 
     /**
-     * @param object $aggregate the loaded draft aggregate (Page/Article/Snippet/Product)
+     * @param object $aggregate the loaded draft aggregate (Page/Article/Snippet/...)
      * @param TemplateInterface|null $dimensionContent the resolved dimension content (carries the article template key)
      */
     public function forEntity(string $type, object $aggregate, ?TemplateInterface $dimensionContent = null): string
@@ -50,8 +49,7 @@ final readonly class ContentSecurityContextResolver
             'page' => $aggregate instanceof PageInterface ? 'sulu.webspaces.' . $aggregate->getWebspaceKey() : '',
             'article' => $this->articleContextResolver->forTemplateKey($dimensionContent?->getTemplateKey() ?? ''),
             'snippet' => 'sulu.snippet.snippets',
-            'product' => 'sulu.product.products',
-            default => '',
+            default => $this->extensionRegistry->has($type) ? $this->extensionRegistry->get($type)->getSecurityContext() : '',
         };
     }
 

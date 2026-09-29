@@ -27,6 +27,7 @@ use Sulu\Component\Security\Authorization\SecurityCheckerInterface;
 use Sulu\Component\Webspace\Manager\WebspaceCollection;
 use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 use Sulu\Component\Webspace\Webspace;
+use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Metadata\ExtensionFieldsProvider;
 use Sulu\Mcp\Application\Metadata\FieldNormalizer;
 use Sulu\Mcp\Application\Metadata\FieldValueExampleProvider;
@@ -61,7 +62,7 @@ final class GetContextToolTest extends TestCase
             $provider->set('page', $pageMetadata);
         }
 
-        return new TemplatesResource($provider, new FieldNormalizer(), new MetadataLocaleResolver(new TokenStorage(), 'en'));
+        return new TemplatesResource($provider, new FieldNormalizer(), new MetadataLocaleResolver(new TokenStorage(), 'en'), new ContentTypeExtensionRegistry([]));
     }
 
     /**
@@ -142,6 +143,7 @@ final class GetContextToolTest extends TestCase
             $checker,
             $webspacePermissionResolver,
             new ArticleSecurityContextResolver(TestGroupProvider::singleGroup()),
+            new ContentTypeExtensionRegistry([]),
             [],
             ['sulu_ping', 'sulu_get_context'],
         );
@@ -315,6 +317,7 @@ final class GetContextToolTest extends TestCase
             $checker,
             $this->webspacePermissionResolver(),
             new ArticleSecurityContextResolver(TestGroupProvider::singleGroup()),
+            new ContentTypeExtensionRegistry([]),
             [],
             ['sulu_ping', 'sulu_get_context'],
         );

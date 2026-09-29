@@ -17,7 +17,6 @@ use Composer\InstalledVersions;
 use Sulu\Mcp\Infrastructure\Symfony\HttpKernel\Compiler\DangerousToolsPass;
 use Sulu\Mcp\Infrastructure\Symfony\HttpKernel\Compiler\ToolPermissionMapPass;
 use Sulu\Mcp\Infrastructure\Symfony\HttpKernel\Compiler\ToolReferenceHandlerPass;
-use Sulu\Product\Infrastructure\Symfony\HttpKernel\SuluProductBundle;
 use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
 use Symfony\Component\Config\Definition\Configuration;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -161,12 +160,6 @@ class SuluMcpBundle extends AbstractBundle
         if (ContainerBuilder::willBeAvailable('symfony/ai-agent', AsTool::class, ['sulu/mcp-bundle'])) {
             $container->import(\dirname(__DIR__, 4) . '/config/services_agent.php');
         }
-
-        // Tools reach the registry only as mcp.tool-tagged services, so skipping the import
-        // is all it takes to keep them out of an installation without SuluProductBundle.
-        if (self::isProductBundleLoaded($builder)) {
-            $container->import(\dirname(__DIR__, 4) . '/config/services_product.php');
-        }
     }
 
     /**
@@ -179,21 +172,6 @@ class SuluMcpBundle extends AbstractBundle
         }
 
         return InstalledVersions::getPrettyVersion('sulu/mcp-bundle') ?? self::FALLBACK_VERSION;
-    }
-
-    /**
-     * The bundle list rather than class_exists(): the classes can be installed without the
-     * bundle being registered, and then its services do not exist to wire against.
-     */
-    private static function isProductBundleLoaded(ContainerBuilder $builder): bool
-    {
-        if (!$builder->hasParameter('kernel.bundles')) {
-            return false;
-        }
-
-        $bundles = $builder->getParameter('kernel.bundles');
-
-        return \is_array($bundles) && \in_array(SuluProductBundle::class, $bundles, true);
     }
 
     public function build(ContainerBuilder $container): void

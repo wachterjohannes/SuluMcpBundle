@@ -29,6 +29,7 @@ use Sulu\Component\Security\Authorization\SecurityCheckerInterface;
 use Sulu\Component\Webspace\Manager\WebspaceCollection;
 use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 use Sulu\Component\Webspace\Webspace;
+use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Search\ContentSearch;
 use Sulu\Mcp\Application\Search\WebsiteSearch;
 use Sulu\Mcp\Application\Security\ToolPermissionChecker;
@@ -68,7 +69,7 @@ final class ContentSearchToolTest extends TestCase
         $engine->createSearchBuilder('website')->willReturn($builder);
         $searcher->search(Argument::cetera())->willReturn(Result::createEmpty());
 
-        $contentSearch = new ContentSearch(new WebsiteSearch($engine->reveal()), $webspaceResolver, $this->prophesize(ToolPermissionCheckerInterface::class)->reveal());
+        $contentSearch = new ContentSearch(new WebsiteSearch($engine->reveal()), $webspaceResolver, $this->prophesize(ToolPermissionCheckerInterface::class)->reveal(), new ContentTypeExtensionRegistry([]));
         $tool = new ContentSearchTool($contentSearch);
 
         $result = $tool('hello', 'en', 'example', 'page', 2, 10);

@@ -57,7 +57,6 @@
         "symfony/ai-agent": "^0.14.1"
     },
     "suggest": {
-        "sulu/product-bundle": "Enables the sulu_product_* MCP tools and type=\"product\" on the unified content tools",
         "symfony/ai-agent": "Exposes sulu_content_search as an agent tool for symfony/ai-agent, in addition to MCP"
     },
     "autoload": {
@@ -75,10 +74,6 @@
     },
     "scripts": {
         "test": [
-            "Composer\\Config::disableProcessTimeout",
-            "vendor/bin/phpunit --exclude-group product,ai-agent"
-        ],
-        "test-with-product": [
             "Composer\\Config::disableProcessTimeout",
             "vendor/bin/phpunit --exclude-group ai-agent"
         ],
@@ -110,10 +105,7 @@
             "@lint-composer",
             "@lint-container",
             "@lint-yaml",
-            "@lint-doctrine"
-        ],
-        "lint-with-product": [
-            "@lint",
+            "@lint-doctrine",
             "@phpstan"
         ],
         "lint-composer": "@composer validate",

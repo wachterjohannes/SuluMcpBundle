@@ -34,6 +34,7 @@ use Sulu\Mcp\Application\Article\ArticleGroupResolver;
 use Sulu\Mcp\Application\Article\ArticleRouteTypeResolver;
 use Sulu\Mcp\Application\Content\BlockDataValidator;
 use Sulu\Mcp\Application\Content\ContentMetadataMapper;
+use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Metadata\MetadataLocaleResolver;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Infrastructure\Sulu\AdminLink\ArticleAdminLinkProvider;
@@ -108,7 +109,7 @@ final class ArticleUpdateToolTest extends TestCase
             new ArticleRouteTypeResolver($this->formMetadataProvider, new MetadataLocaleResolver(new TokenStorage(), 'en')),
             $this->permissionChecker,
             $this->articleContextResolver,
-            new ContentSecurityContextResolver($this->articleContextResolver, $this->contentManager->reveal()),
+            new ContentSecurityContextResolver($this->articleContextResolver, $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
         );
     }
 
@@ -329,7 +330,7 @@ final class ArticleUpdateToolTest extends TestCase
             new ArticleRouteTypeResolver($this->formMetadataProvider, new MetadataLocaleResolver(new TokenStorage(), 'en')),
             $this->permissionChecker,
             $contextResolver,
-            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal()),
+            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
         );
 
         $currentArticle = new Article();
@@ -372,7 +373,7 @@ final class ArticleUpdateToolTest extends TestCase
             new ArticleRouteTypeResolver($this->formMetadataProvider, new MetadataLocaleResolver(new TokenStorage(), 'en')),
             $this->permissionChecker,
             $contextResolver,
-            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal()),
+            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
         );
 
         $currentArticle = new Article();
@@ -421,7 +422,7 @@ final class ArticleUpdateToolTest extends TestCase
             new ArticleRouteTypeResolver($this->formMetadataProvider, new MetadataLocaleResolver(new TokenStorage(), 'en')),
             $this->permissionChecker,
             $contextResolver,
-            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal()),
+            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
         );
 
         $currentArticle = new Article();
@@ -479,7 +480,7 @@ final class ArticleUpdateToolTest extends TestCase
             new ArticleRouteTypeResolver($this->formMetadataProvider, new MetadataLocaleResolver(new TokenStorage(), 'en')),
             $this->permissionChecker,
             $contextResolver,
-            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal()),
+            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
         );
 
         $currentArticle = new Article();
@@ -561,7 +562,7 @@ final class ArticleUpdateToolTest extends TestCase
             new ArticleRouteTypeResolver($this->formMetadataProvider, new MetadataLocaleResolver(new TokenStorage(), 'en')),
             $this->permissionChecker,
             $contextResolver,
-            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal()),
+            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
         );
 
         $currentArticle = new Article();
@@ -762,7 +763,7 @@ final class ArticleUpdateToolTest extends TestCase
             new ArticleRouteTypeResolver($this->formMetadataProvider, new MetadataLocaleResolver(new TokenStorage(), 'en')),
             $this->permissionChecker,
             $this->articleContextResolver,
-            new ContentSecurityContextResolver($this->articleContextResolver, $this->contentManager->reveal()),
+            new ContentSecurityContextResolver($this->articleContextResolver, $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
         );
 
         $currentArticle = new Article();
@@ -995,7 +996,7 @@ final class ArticleUpdateToolTest extends TestCase
             new ArticleRouteTypeResolver($this->formMetadataProvider, new MetadataLocaleResolver(new TokenStorage(), 'en')),
             $this->permissionChecker,
             $contextResolver,
-            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal()),
+            new ContentSecurityContextResolver($contextResolver, $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
         );
     }
 }
