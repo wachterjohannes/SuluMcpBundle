@@ -20,8 +20,7 @@ use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
 
 /**
  * Keyword search over the `website` SEAL index, the logic behind the `sulu_content_search` MCP
- * tool. Framework-agnostic on purpose: it depends on no MCP type, so it can be driven from any
- * caller, not only the tool adapter.
+ * tool.
  *
  * @internal
  */
@@ -70,10 +69,8 @@ final class ContentSearch
             return ['results' => [], 'total' => 0, 'hint' => \sprintf('Webspace "%s" is not readable with your permissions.', $webspace)];
         }
 
-        // Products land in the same `website` index as pages/articles, indexed whenever
-        // SuluProductBundle is installed regardless of "additional_product_filters". An untyped
-        // search or an explicit type="products" would otherwise leak them to anyone with
-        // webspace VIEW. The product security context is separate and has to be checked here.
+        // Products are indexed here too whenever SuluProductBundle is installed, so an untyped
+        // search or type="products" would otherwise leak them to anyone with webspace VIEW alone.
         $resourceKey = null !== $type ? (self::TYPE_MAP[$type] ?? $type) : null;
 
         if (self::PRODUCT_RESOURCE_KEY === $resourceKey && !$this->productsIndexed) {
