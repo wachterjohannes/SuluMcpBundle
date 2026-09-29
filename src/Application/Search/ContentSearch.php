@@ -18,35 +18,25 @@ use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
+use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 
 /**
  * Keyword search over the `website` SEAL index, the logic behind the `sulu_content_search` MCP
  * tool.
  *
- * Whitelist, not blacklist: only pages, articles the caller may view and resourceKeys a
- * {@see ContentTypeExtensionRegistry} extension declares are ever returned. An
- * indexed resourceKey nobody registered for MCP stays invisible, rather than
- * leaking to anyone with webspace VIEW.
+ * Whitelist, not blacklist: only the resourceKeys a {@see ContentTypeExtensionRegistry} extension
+ * declares AND the caller may view are ever returned. An indexed resourceKey nobody registered
+ * for MCP stays invisible, rather than leaking to anyone with webspace VIEW.
  *
  * @internal
  */
 final class ContentSearch
 {
-    private const TYPE_MAP = [
-        'page' => 'pages',
-        'article' => 'articles',
-    ];
-
-    private const PAGE_RESOURCE_KEY = 'pages';
-    private const ARTICLE_RESOURCE_KEY = 'articles';
-
     public function __construct(
         private readonly WebsiteSearch $websiteSearch,
         private readonly WebspacePermissionResolver $webspacePermissionResolver,
         private readonly ToolPermissionCheckerInterface $permissionChecker,
         private readonly ContentTypeExtensionRegistry $extensionRegistry,
-        private readonly ArticleSecurityContextResolver $articleContextResolver,
     ) {
     }
 
@@ -57,7 +47,7 @@ final class ContentSearch
         string $query,
         string $locale,
         ?string $webspace = null,
-        ?string $type = null,
+        ?string $resourceKey = null,
         int $page = 1,
         int $limit = 20,
     ): array {
@@ -74,40 +64,29 @@ final class ContentSearch
             return ['results' => [], 'total' => 0, 'hint' => \sprintf('Webspace "%s" is not readable with your permissions.', $webspace)];
         }
 
-        // A page's security context is its webspace, checked above. Articles and extension
-        // types carry their own context, so each needs an extra check here.
-        $visibleResourceKeys = [self::PAGE_RESOURCE_KEY];
-        $canSeeArticles = $this->hasArticlePermission($locale);
-        if ($canSeeArticles) {
-            $visibleResourceKeys[] = self::ARTICLE_RESOURCE_KEY;
-        }
+        // A type with no view contexts (pages) is governed by the webspace check above.
+        // Every other type carries its own security context and needs an extra check here.
+        $visibleResourceKeys = [];
         foreach ($this->extensionRegistry->all() as $extension) {
-            if ($this->permissionChecker->has($extension->getSecurityContext(), PermissionTypes::VIEW, $locale)) {
+            if ($this->canView($extension, $locale)) {
                 $visibleResourceKeys[] = $extension->getResourceKey();
             }
         }
 
-        $resourceKey = null !== $type ? (self::TYPE_MAP[$type] ?? $type) : null;
-
-        if (self::ARTICLE_RESOURCE_KEY === $resourceKey && !$canSeeArticles) {
-            return [
-                'error' => 'Permission denied: no accessible security context grants the required permissions.',
-                'hint' => 'Requires VIEW on "sulu.article.articles" (or the matching article group context).',
-            ];
-        }
-
         if (null !== $resourceKey && !\in_array($resourceKey, $visibleResourceKeys, true)) {
-            $extension = $this->extensionRegistry->findByResourceKey($resourceKey);
+            $extension = $this->extensionRegistry->find($resourceKey);
             if (null !== $extension) {
+                $contexts = \array_map(static fn (string $context): string => \sprintf('"%s"', $context), $extension->getViewSecurityContexts());
+
                 return [
                     'error' => 'Permission denied: no accessible security context grants the required permissions.',
-                    'hint' => \sprintf('Requires VIEW on "%s".', $extension->getSecurityContext()),
+                    'hint' => \sprintf('Requires VIEW on %s.', 1 === \count($contexts) ? $contexts[0] : 'one of ' . \implode(', ', $contexts)),
                 ];
             }
 
             return [
-                'error' => \sprintf('Unsupported content type "%s".', $type),
-                'hint' => \sprintf('Supported: %s.', \implode(', ', ['page', 'article', ...$this->extensionRegistry->types()])),
+                'error' => \sprintf('Unsupported content type "%s".', $resourceKey),
+                'hint' => \sprintf('Supported: %s.', \implode(', ', $this->extensionRegistry->resourceKeys())),
             ];
         }
 
@@ -126,8 +105,8 @@ final class ContentSearch
             return [
                 'error' => \sprintf('Content search failed: %s', $e->getMessage()),
                 'hint' => \sprintf(
-                    'Only published content is indexed. Verify the locale is correct and type is %s (or omit to search all).',
-                    \implode(', ', \array_map(static fn (string $t): string => \sprintf('"%s"', $t), ['page', 'article', ...$this->extensionRegistry->types()])),
+                    'Only published content is indexed. Verify the locale is correct and resourceKey is one of %s (or omit to search all).',
+                    \implode(', ', \array_map(static fn (string $key): string => \sprintf('"%s"', $key), $this->extensionRegistry->resourceKeys())),
                 ),
             ];
         }
@@ -135,12 +114,17 @@ final class ContentSearch
 
     /**
      * The `website` index carries no template, so per-group filtering the way
-     * ArticleListTool does isn't possible here: VIEW on any one article group is
-     * enough to see article results at all.
+     * ArticleListTool does isn't possible here: VIEW on any one of an extension's
+     * contexts (e.g. one article group) is enough to see its results at all.
      */
-    private function hasArticlePermission(string $locale): bool
+    private function canView(ContentTypeExtensionInterface $extension, string $locale): bool
     {
-        foreach ($this->articleContextResolver->candidates() as $context) {
+        $contexts = $extension->getViewSecurityContexts();
+        if ([] === $contexts) {
+            return true;
+        }
+
+        foreach ($contexts as $context) {
             if ($this->permissionChecker->has($context, PermissionTypes::VIEW, $locale)) {
                 return true;
             }

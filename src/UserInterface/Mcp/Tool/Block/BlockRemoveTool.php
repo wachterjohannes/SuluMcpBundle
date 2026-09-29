@@ -24,6 +24,7 @@ use Sulu\Mcp\Application\Content\BlockDataNormalizerTrait;
 use Sulu\Mcp\Application\Content\ContentLocaleTrait;
 use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
+use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
@@ -33,7 +34,6 @@ use Sulu\Mcp\Domain\Security\PermissionRequirement;
 use Sulu\Mcp\Domain\Security\RequiresPermission;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Messenger\Infrastructure\Symfony\Messenger\FlushMiddleware\EnableFlushStamp;
-use Sulu\Page\Domain\Model\Page;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\HandleTrait;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -63,7 +63,7 @@ class BlockRemoveTool
     #[McpTool(
         name: 'sulu_block_remove',
         title: 'Remove Block',
-        description: 'Remove a block from a page, article, snippet, or any type a bundle registers, by its 0-based index OR its _id (blockId). Pass "type" ("page", "article", "snippet", or another registered type) and the entity "uuid". Provide EITHER "blockIndex" (0-based) OR "blockId" (the block _id value). Prefer blockId — it is robust because ids do not shift as blocks are added/removed. Call sulu_block_list (or sulu_page_get / sulu_article_get / sulu_snippet_get) first to see the current blocks array and identify which block to remove. The blockProperty must match the template property name that holds blocks. Remaining blocks shift down to fill the gap. The entity must be re-published after removing blocks.',
+        description: 'Remove a block from a content entity, by its 0-based index OR its _id (blockId). Pass "resourceKey" (one of {contentResourceKeys}) and the entity "uuid". Provide EITHER "blockIndex" (0-based) OR "blockId" (the block _id value). Prefer blockId — it is robust because ids do not shift as blocks are added/removed. Call sulu_block_list (or sulu_page_get / sulu_article_get / sulu_snippet_get) first to see the current blocks array and identify which block to remove. The blockProperty must match the template property name that holds blocks. Remaining blocks shift down to fill the gap. The entity must be re-published after removing blocks.',
         annotations: new ToolAnnotations(readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false),
     )]
     #[DangerousTool('block_remove')]
@@ -73,7 +73,8 @@ class BlockRemoveTool
         discoveryContexts: ['sulu.snippet.snippets', ContentTypeExtensionRegistry::ANY_EXTENSION_CONTEXT, ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT, WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT],
     )]
     public function removeBlock(
-        string $type,
+        #[Schema(description: 'The resourceKey of the content type: {contentResourceKeys}.', enum: [ContentTypeSchemaExpander::CONTENT_RESOURCE_KEYS])]
+        string $resourceKey,
         string $uuid,
         string $locale,
         string $blockProperty,
@@ -83,8 +84,8 @@ class BlockRemoveTool
         ?string $blockId = null,
     ): array {
         try {
-            if (!$this->contentTypeResolver->supports($type)) {
-                return ['error' => \sprintf('Unsupported content type "%s". Supported: %s.', $type, \implode(', ', $this->contentTypeResolver->supportedTypes()))];
+            if (!$this->contentTypeResolver->supports($resourceKey)) {
+                return ['error' => \sprintf('Unsupported content type "%s". Supported: %s.', $resourceKey, \implode(', ', $this->contentTypeResolver->supportedResourceKeys()))];
             }
 
             if (null === $blockIndex && null === $blockId) {
@@ -97,18 +98,19 @@ class BlockRemoveTool
                 return ['error' => 'Provide either blockIndex or blockId, not both.'];
             }
 
-            $entity = $this->contentTypeResolver->loadDraft($type, $uuid, $locale, loadGhost: true);
+            $entity = $this->contentTypeResolver->loadDraft($resourceKey, $uuid, $locale, loadGhost: true);
             if (null === $entity) {
-                return ['error' => \sprintf('%s not found: %s', \ucfirst($type), $uuid)];
+                return ['error' => \sprintf('%s not found: %s', \ucfirst($resourceKey), $uuid)];
             }
 
+            $extension = $this->contentTypeResolver->get($resourceKey);
             $dimensionContent = $this->contentManager->resolve($entity, [ // @phpstan-ignore argument.type, argument.templateType (upstream generic is invariant; loadDraft() returns a bare object)
                 'locale' => $locale,
                 'stage' => DimensionContentInterface::STAGE_DRAFT,
             ]);
 
             $context = $this->contentSecurityContextResolver->forEntityInLocale(
-                $type,
+                $resourceKey,
                 $entity,
                 $dimensionContent,
                 $locale,
@@ -117,11 +119,11 @@ class BlockRemoveTool
                 $context,
                 PermissionTypes::EDIT,
                 $locale,
-                'page' === $type ? Page::class : null,
-                'page' === $type ? $uuid : null,
+                $extension->getAclObjectType(),
+                null !== $extension->getAclObjectType() ? $uuid : null,
             );
 
-            if ($missingTranslation = self::missingBlockTranslationError($dimensionContent, $type, $uuid, $locale)) {
+            if ($missingTranslation = self::missingBlockTranslationError($dimensionContent, $resourceKey, $uuid, $locale)) {
                 return $missingTranslation;
             }
 
@@ -134,7 +136,7 @@ class BlockRemoveTool
                 $resolvedIndex = $this->resolveBlockIndexById($blockId, $blocks);
                 if (null === $resolvedIndex) {
                     return [
-                        'error' => \sprintf('Block _id "%s" not found in %s %s.', $blockId, $type, $uuid),
+                        'error' => \sprintf('Block _id "%s" not found in %s %s.', $blockId, $resourceKey, $uuid),
                         'hint' => 'Use sulu_block_list to see the current block _id values.',
                     ];
                 }
@@ -146,7 +148,7 @@ class BlockRemoveTool
                     'error' => \sprintf(
                         'Block index %d out of range. %s has %d block(s) (valid indices: 0-%d).',
                         $blockIndex,
-                        \ucfirst($type),
+                        \ucfirst($resourceKey),
                         \count($blocks),
                         \max(0, \count($blocks) - 1),
                     ),
@@ -165,7 +167,7 @@ class BlockRemoveTool
             // Ensure all array keys are strings (Sulu's MetadataResolver requires string keys)
             $data = $this->stringifyKeys($data);
 
-            $message = $this->contentTypeResolver->createModifyMessage($type, $uuid, $data);
+            $message = $this->contentTypeResolver->createModifyMessage($resourceKey, $uuid, $data);
 
             $this->handle(new Envelope($message, [new EnableFlushStamp()]));
 
@@ -179,7 +181,7 @@ class BlockRemoveTool
             throw new ToolCallException($e->getMessage(), 0, $e);
         } catch (\Throwable $e) {
             return [
-                'error' => \sprintf('Failed to remove block from %s %s: %s', $type, $uuid, $e->getMessage()),
+                'error' => \sprintf('Failed to remove block from %s %s: %s', $resourceKey, $uuid, $e->getMessage()),
                 'hint' => 'Use sulu_block_list to see current blocks and their indices and _id values before removing.',
             ];
         }

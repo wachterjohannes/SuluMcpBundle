@@ -25,7 +25,7 @@ use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 final class FakeContentTypeExtension implements ContentTypeExtensionInterface
 {
     public function __construct(
-        private readonly string $type = 'widget',
+        private readonly string $templateType = 'widget',
         private readonly string $resourceKey = 'widgets',
         private readonly string $securityContext = 'sulu.widget.widgets',
         private readonly ?object $draft = null,
@@ -33,9 +33,9 @@ final class FakeContentTypeExtension implements ContentTypeExtensionInterface
     ) {
     }
 
-    public function getType(): string
+    public function getTemplateType(): string
     {
-        return $this->type;
+        return $this->templateType;
     }
 
     public function getResourceKey(): string
@@ -43,9 +43,33 @@ final class FakeContentTypeExtension implements ContentTypeExtensionInterface
         return $this->resourceKey;
     }
 
-    public function getSecurityContext(): string
+    public function getViewSecurityContexts(): array
+    {
+        return [$this->securityContext];
+    }
+
+    public function getEntitySecurityContext(object $aggregate, ?string $templateKey): string
     {
         return $this->securityContext;
+    }
+
+    public function requiresResolvedContent(): bool
+    {
+        return false;
+    }
+
+    public function getAclObjectType(): ?string
+    {
+        return null;
+    }
+
+    public function getWebspaceKey(object $aggregate): ?string
+    {
+        return null;
+    }
+
+    public function assertCanRemove(string $uuid): void
+    {
     }
 
     public function loadDraft(string $uuid, string $locale, bool $loadGhost = false): ?object

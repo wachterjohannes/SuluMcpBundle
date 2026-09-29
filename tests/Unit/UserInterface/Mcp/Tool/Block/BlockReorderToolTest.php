@@ -26,11 +26,10 @@ use Sulu\Article\Application\Message\ModifyArticleMessage;
 use Sulu\Article\Domain\Model\Article;
 use Sulu\Article\Domain\Repository\ArticleRepositoryInterface;
 use Sulu\Content\Application\ContentManager\ContentManagerInterface;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeToolPermissionChecker;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Block\BlockReorderTool;
 use Sulu\Page\Application\Message\ModifyPageMessage;
@@ -78,10 +77,10 @@ final class BlockReorderToolTest extends TestCase
         $this->contentManager = $this->prophesize(ContentManagerInterface::class);
         $this->permissionChecker = FakeToolPermissionChecker::grantingAll();
         $groupProvider = new TestGroupProvider([]);
-        $this->contentSecurityContextResolver = new ContentSecurityContextResolver(new ArticleSecurityContextResolver($groupProvider), $this->contentManager->reveal(), new ContentTypeExtensionRegistry([]));
+        $this->contentSecurityContextResolver = ContentTypes::securityResolver($this->contentManager->reveal(), $groupProvider);
         $this->tool = new BlockReorderTool(
             $this->messageBus->reveal(),
-            new ContentTypeResolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::resolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), $groupProvider),
             $this->contentManager->reveal(),
             $this->permissionChecker,
             $this->contentSecurityContextResolver,
@@ -93,9 +92,9 @@ final class BlockReorderToolTest extends TestCase
      */
     public static function contentTypeProvider(): iterable
     {
-        yield 'page' => ['page', ModifyPageMessage::class];
-        yield 'article' => ['article', ModifyArticleMessage::class];
-        yield 'snippet' => ['snippet', ModifySnippetMessage::class];
+        yield 'page' => ['pages', ModifyPageMessage::class];
+        yield 'article' => ['articles', ModifyArticleMessage::class];
+        yield 'snippet' => ['snippets', ModifySnippetMessage::class];
     }
 
     /**
@@ -146,14 +145,14 @@ final class BlockReorderToolTest extends TestCase
         $this->pageRepository->getOneBy(Argument::cetera())->willThrow(new \RuntimeException('not found'));
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->reorderBlocks('page', 'missing-uuid', 'en', 'blocks', [0]);
+        $result = $this->tool->reorderBlocks('pages', 'missing-uuid', 'en', 'blocks', [0]);
 
         $this->assertArrayHasKey('error', $result);
     }
 
     public function testReorderBlocksReturnsErrorForWrongLength(): void
     {
-        $this->setupEntityWithBlocks('page', [
+        $this->setupEntityWithBlocks('pages', [
             ['type' => 'text', 'title' => 'First'],
             ['type' => 'text', 'title' => 'Second'],
             ['type' => 'text', 'title' => 'Third'],
@@ -161,7 +160,7 @@ final class BlockReorderToolTest extends TestCase
 
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', [0, 1]);
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', [0, 1]);
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('does not match block count', $result['error']);
@@ -169,7 +168,7 @@ final class BlockReorderToolTest extends TestCase
 
     public function testReorderBlocksReturnsErrorForDuplicateIndices(): void
     {
-        $this->setupEntityWithBlocks('page', [
+        $this->setupEntityWithBlocks('pages', [
             ['type' => 'text', 'title' => 'First'],
             ['type' => 'text', 'title' => 'Second'],
             ['type' => 'text', 'title' => 'Third'],
@@ -177,7 +176,7 @@ final class BlockReorderToolTest extends TestCase
 
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', [0, 0, 1]);
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', [0, 0, 1]);
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('exactly once', $result['error']);
@@ -185,7 +184,7 @@ final class BlockReorderToolTest extends TestCase
 
     public function testReorderBlocksReturnsErrorForOutOfRangeIndex(): void
     {
-        $this->setupEntityWithBlocks('page', [
+        $this->setupEntityWithBlocks('pages', [
             ['type' => 'text', 'title' => 'First'],
             ['type' => 'text', 'title' => 'Second'],
             ['type' => 'text', 'title' => 'Third'],
@@ -193,7 +192,7 @@ final class BlockReorderToolTest extends TestCase
 
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', [0, 1, 5]);
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', [0, 1, 5]);
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('exactly once', $result['error']);
@@ -201,7 +200,7 @@ final class BlockReorderToolTest extends TestCase
 
     public function testReorderBlocksAcceptsNumericStringIndices(): void
     {
-        $this->setupEntityWithBlocks('page', [
+        $this->setupEntityWithBlocks('pages', [
             ['type' => 'text', 'title' => 'First'],
             ['type' => 'text', 'title' => 'Second'],
         ]);
@@ -215,7 +214,7 @@ final class BlockReorderToolTest extends TestCase
                 return $envelope->with(new HandledStamp(null, 'handler'));
             });
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', ['1', '0']);
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', ['1', '0']);
 
         $this->assertTrue($result['success']);
         $this->assertSame([1, 0], $result['order']);
@@ -225,7 +224,7 @@ final class BlockReorderToolTest extends TestCase
     {
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', ['first']);
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', ['first']);
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('integer indices', $result['error']);
@@ -257,7 +256,7 @@ final class BlockReorderToolTest extends TestCase
 
     public function testReorderByBlockIdsReordersByIdentity(): void
     {
-        $this->setupEntityWithBlocks('page', [
+        $this->setupEntityWithBlocks('pages', [
             ['_id' => 'a', 'type' => 'text', 'title' => 'First'],
             ['_id' => 'b', 'type' => 'image', 'src' => '/img.jpg'],
             ['_id' => 'c', 'type' => 'text', 'title' => 'Third'],
@@ -272,7 +271,7 @@ final class BlockReorderToolTest extends TestCase
                 return $envelope->with(new HandledStamp(null, 'handler'));
             });
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', null, ['c', 'a', 'b']);
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', null, ['c', 'a', 'b']);
 
         $this->assertTrue($result['success']);
         $this->assertSame([2, 0, 1], $result['order']);
@@ -280,14 +279,14 @@ final class BlockReorderToolTest extends TestCase
 
     public function testReorderByBlockIdsRejectsUnknownId(): void
     {
-        $this->setupEntityWithBlocks('page', [
+        $this->setupEntityWithBlocks('pages', [
             ['_id' => 'a', 'type' => 'text', 'title' => 'First'],
             ['_id' => 'b', 'type' => 'text', 'title' => 'Second'],
         ]);
 
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', null, ['a', 'missing']);
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', null, ['a', 'missing']);
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('missing', $result['error']);
@@ -297,7 +296,7 @@ final class BlockReorderToolTest extends TestCase
     {
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks');
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks');
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('newOrder', $result['error']);
@@ -308,7 +307,7 @@ final class BlockReorderToolTest extends TestCase
     {
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', [0, 1], ['a', 'b']);
+        $result = $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', [0, 1], ['a', 'b']);
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('not both', $result['error']);
@@ -316,7 +315,7 @@ final class BlockReorderToolTest extends TestCase
 
     public function testReorderBlocksThrowsToolCallExceptionWhenPermissionDenied(): void
     {
-        $this->setupEntityWithBlocks('page', [
+        $this->setupEntityWithBlocks('pages', [
             ['type' => 'text', 'title' => 'First'],
         ]);
 
@@ -326,7 +325,7 @@ final class BlockReorderToolTest extends TestCase
 
         $this->expectException(ToolCallException::class);
 
-        $this->tool->reorderBlocks('page', 'test-uuid', 'en', 'blocks', [0]);
+        $this->tool->reorderBlocks('pages', 'test-uuid', 'en', 'blocks', [0]);
     }
 
     /**
@@ -337,8 +336,8 @@ final class BlockReorderToolTest extends TestCase
         $entity = $this->createEntity($type);
 
         match ($type) {
-            'article' => $this->articleRepository->getOneBy(Argument::cetera())->willReturn($entity),
-            'snippet' => $this->snippetRepository->getOneBy(Argument::cetera())->willReturn($entity),
+            'articles' => $this->articleRepository->getOneBy(Argument::cetera())->willReturn($entity),
+            'snippets' => $this->snippetRepository->getOneBy(Argument::cetera())->willReturn($entity),
             default => $this->pageRepository->getOneBy(Argument::cetera())->willReturn($entity),
         };
 
@@ -354,11 +353,11 @@ final class BlockReorderToolTest extends TestCase
 
     private function createEntity(string $type): object
     {
-        if ('article' === $type) {
+        if ('articles' === $type) {
             return new Article('test-uuid');
         }
 
-        if ('snippet' === $type) {
+        if ('snippets' === $type) {
             return new Snippet('test-uuid');
         }
 
@@ -379,7 +378,7 @@ final class BlockReorderToolTest extends TestCase
         $ghostDimensionContent->addAvailableLocale('de');
         $this->contentManager->resolve(Argument::cetera())->willReturn($ghostDimensionContent);
 
-        $result = $this->tool->reorderBlocks('page', 'uuid-1', 'en', 'blocks', null, ['block-1']);
+        $result = $this->tool->reorderBlocks('pages', 'uuid-1', 'en', 'blocks', null, ['block-1']);
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('has no "en" content yet', $result['error']);

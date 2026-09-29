@@ -17,25 +17,20 @@ use Sulu\Content\Application\ContentManager\ContentManagerInterface;
 use Sulu\Content\Domain\Model\ContentRichEntityInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
-use Sulu\Page\Domain\Model\PageInterface;
+use Sulu\Mcp\Application\Content\ContentTypeResolver;
 
 /**
- * Per-type security context for a loaded content entity:
- * page → sulu.webspaces.<key> (from the aggregate), article → per-group (from the
- * RESOLVED dimension content's template key — NOT the aggregate),
- * snippet → sulu.snippet.snippets, any other registered type → its extension's
- * security context.
+ * Security context for a loaded content entity, asked from its content type extension:
+ * a page is secured by its webspace, an article per template group (from the RESOLVED dimension
+ * content's template key, NOT the aggregate), a snippet and any registered type by its own context.
  *
  * @internal
  */
 final readonly class ContentSecurityContextResolver
 {
     public function __construct(
-        private ArticleSecurityContextResolver $articleContextResolver,
         private ContentManagerInterface $contentManager,
-        private ContentTypeExtensionRegistry $extensionRegistry,
+        private ContentTypeResolver $contentTypeResolver,
     ) {
     }
 
@@ -43,14 +38,9 @@ final readonly class ContentSecurityContextResolver
      * @param object $aggregate the loaded draft aggregate (Page/Article/Snippet/...)
      * @param TemplateInterface|null $dimensionContent the resolved dimension content (carries the article template key)
      */
-    public function forEntity(string $type, object $aggregate, ?TemplateInterface $dimensionContent = null): string
+    public function forEntity(string $resourceKey, object $aggregate, ?TemplateInterface $dimensionContent = null): string
     {
-        return match ($type) {
-            'page' => $aggregate instanceof PageInterface ? 'sulu.webspaces.' . $aggregate->getWebspaceKey() : '',
-            'article' => $this->articleContextResolver->forTemplateKey($dimensionContent?->getTemplateKey() ?? ''),
-            'snippet' => 'sulu.snippet.snippets',
-            default => $this->extensionRegistry->has($type) ? $this->extensionRegistry->get($type)->getSecurityContext() : '',
-        };
+        return $this->contentTypeResolver->find($resourceKey)?->getEntitySecurityContext($aggregate, $dimensionContent?->getTemplateKey()) ?? '';
     }
 
     /**
@@ -62,17 +52,17 @@ final readonly class ContentSecurityContextResolver
      * @param object $aggregate the loaded draft aggregate (Page/Article/Snippet)
      * @param DimensionContentInterface<T> $dimensionContent the dimension content resolved for $locale, ghost or not
      */
-    public function forEntityInLocale(string $type, object $aggregate, DimensionContentInterface $dimensionContent, string $locale): string
+    public function forEntityInLocale(string $resourceKey, object $aggregate, DimensionContentInterface $dimensionContent, string $locale): string
     {
         $ghostLocale = $dimensionContent->getGhostLocale();
 
-        if ('article' === $type && $locale !== $dimensionContent->getLocale() && null !== $ghostLocale) {
+        if (true === $this->contentTypeResolver->find($resourceKey)?->requiresResolvedContent() && $locale !== $dimensionContent->getLocale() && null !== $ghostLocale) {
             $dimensionContent = $this->contentManager->resolve($aggregate, [ // @phpstan-ignore argument.type, argument.templateType (upstream generic is invariant; the caller holds a bare object)
                 'locale' => $ghostLocale,
                 'stage' => DimensionContentInterface::STAGE_DRAFT,
             ]);
         }
 
-        return $this->forEntity($type, $aggregate, $dimensionContent instanceof TemplateInterface ? $dimensionContent : null);
+        return $this->forEntity($resourceKey, $aggregate, $dimensionContent instanceof TemplateInterface ? $dimensionContent : null);
     }
 }

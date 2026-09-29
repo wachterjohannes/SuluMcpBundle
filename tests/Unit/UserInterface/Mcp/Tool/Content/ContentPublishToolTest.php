@@ -24,11 +24,8 @@ use Sulu\Article\Domain\Model\Article;
 use Sulu\Article\Domain\Model\ArticleDimensionContent;
 use Sulu\Article\Domain\Repository\ArticleRepositoryInterface;
 use Sulu\Content\Application\ContentManager\ContentManagerInterface;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
-use Sulu\Mcp\Application\Content\ContentTypeResolver;
-use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeToolPermissionChecker;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Content\ContentPublishTool;
 use Sulu\Messenger\Infrastructure\Symfony\Messenger\FlushMiddleware\EnableFlushStamp;
@@ -76,16 +73,16 @@ final class ContentPublishToolTest extends TestCase
 
         $this->tool = new ContentPublishTool(
             $this->messageBus->reveal(),
-            new ContentTypeResolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::resolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), $groupProvider),
             $this->contentManager->reveal(),
             $this->permissionChecker,
-            new ContentSecurityContextResolver(new ArticleSecurityContextResolver($groupProvider), $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::securityResolver($this->contentManager->reveal(), $groupProvider),
         );
     }
 
     public function testPublishPageDispatchesTransitionWithPublishName(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $captured = null;
         $this->messageBus->dispatch(Argument::cetera())
@@ -96,12 +93,12 @@ final class ContentPublishToolTest extends TestCase
                 return $args[0]->with(new HandledStamp(null, 'handler'));
             });
 
-        $result = $this->tool->publishContent('page', 'uuid-1', 'en');
+        $result = $this->tool->publishContent('pages', 'uuid-1', 'en');
 
         $this->assertInstanceOf(Envelope::class, $captured);
         $this->assertInstanceOf(ApplyWorkflowTransitionPageMessage::class, $captured->getMessage());
         $this->assertArrayHasKey(EnableFlushStamp::class, $captured->all());
-        $this->assertSame(['success' => true, 'type' => 'page', 'uuid' => 'uuid-1', 'action' => 'published', 'locale' => 'en'], $result);
+        $this->assertSame(['success' => true, 'resourceKey' => 'pages', 'uuid' => 'uuid-1', 'action' => 'published', 'locale' => 'en'], $result);
     }
 
     public function testUnsupportedTypeReturnsError(): void
@@ -115,16 +112,16 @@ final class ContentPublishToolTest extends TestCase
         $this->pageRepository->getOneBy(Argument::cetera())->willThrow(new \RuntimeException('not found'));
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->publishContent('page', 'missing-uuid', 'en');
+        $result = $this->tool->publishContent('pages', 'missing-uuid', 'en');
 
         $this->assertArrayHasKey('error', $result);
     }
 
     public function testErrorOnException(): void
     {
-        $this->setupEntity('article');
+        $this->setupEntity('articles');
         $this->messageBus->dispatch(Argument::cetera())->willThrow(new \RuntimeException('boom'));
-        $this->assertStringContainsString('boom', $this->tool->publishContent('article', 'uuid-1', 'en')['error']);
+        $this->assertStringContainsString('boom', $this->tool->publishContent('articles', 'uuid-1', 'en')['error']);
     }
 
     public function testMethodHasMcpToolAttribute(): void
@@ -135,7 +132,7 @@ final class ContentPublishToolTest extends TestCase
 
     public function testPublishContentThrowsToolCallExceptionWhenPermissionDenied(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->permissionChecker->denyAll();
 
@@ -143,24 +140,24 @@ final class ContentPublishToolTest extends TestCase
 
         $this->expectException(ToolCallException::class);
 
-        $this->tool->publishContent('page', 'uuid-1', 'en');
+        $this->tool->publishContent('pages', 'uuid-1', 'en');
     }
 
     private function setupEntity(string $type): void
     {
         $entity = match ($type) {
-            'article' => new Article('uuid-1'),
-            'snippet' => new Snippet('uuid-1'),
+            'articles' => new Article('uuid-1'),
+            'snippets' => new Snippet('uuid-1'),
             default => (new Page('uuid-1'))->setWebspaceKey('example'),
         };
 
         match ($type) {
-            'article' => $this->articleRepository->getOneBy(Argument::cetera())->willReturn($entity),
-            'snippet' => $this->snippetRepository->getOneBy(Argument::cetera())->willReturn($entity),
+            'articles' => $this->articleRepository->getOneBy(Argument::cetera())->willReturn($entity),
+            'snippets' => $this->snippetRepository->getOneBy(Argument::cetera())->willReturn($entity),
             default => $this->pageRepository->getOneBy(Argument::cetera())->willReturn($entity),
         };
 
-        if ('article' === $type) {
+        if ('articles' === $type) {
             $dimensionContent = new ArticleDimensionContent($entity);
             $dimensionContent->setTemplateKey('default');
             $this->contentManager->resolve(Argument::cetera())->willReturn($dimensionContent);

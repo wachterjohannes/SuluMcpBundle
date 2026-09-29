@@ -19,10 +19,10 @@ use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TagMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Metadata\FieldNormalizer;
 use Sulu\Mcp\Application\Metadata\MetadataLocaleResolver;
 use Sulu\Mcp\Tests\Unit\Fixture\ArrayMetadataProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\UserInterface\Mcp\Resource\TemplatesResource;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 
@@ -35,7 +35,7 @@ final class TemplatesResourceGlobalBlockTest extends TestCase
     protected function setUp(): void
     {
         $this->formMetadataProvider = new ArrayMetadataProvider();
-        $this->resource = new TemplatesResource($this->formMetadataProvider, new FieldNormalizer(), new MetadataLocaleResolver(new TokenStorage(), 'en'), new ContentTypeExtensionRegistry([]));
+        $this->resource = new TemplatesResource($this->formMetadataProvider, new FieldNormalizer(), new MetadataLocaleResolver(new TokenStorage(), 'en'), ContentTypes::inertResolver());
     }
 
     public function testGlobalBlockTypeProducesReferenceWithoutFieldsOrRecursion(): void
@@ -64,7 +64,7 @@ final class TemplatesResourceGlobalBlockTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $blocksField = $result['page']['default']['fields'][0];
+        $blocksField = $result['pages']['default']['fields'][0];
         $this->assertSame([
             'heading' => [
                 'key' => 'heading',
@@ -100,7 +100,7 @@ final class TemplatesResourceGlobalBlockTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $blocksField = $result['page']['default']['fields'][0];
+        $blocksField = $result['pages']['default']['fields'][0];
         $textType = $blocksField['types']['text'];
         $this->assertCount(1, $textType['fields']);
         $this->assertSame('content', $textType['fields'][0]['name']);
@@ -140,7 +140,7 @@ final class TemplatesResourceGlobalBlockTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $blocksField = $result['page']['homepage']['fields'][0];
+        $blocksField = $result['pages']['homepage']['fields'][0];
         $this->assertCount(2, $blocksField['types']);
 
         $quoteType = $blocksField['types']['quote'];

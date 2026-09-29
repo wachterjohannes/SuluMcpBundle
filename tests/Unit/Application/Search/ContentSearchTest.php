@@ -28,6 +28,7 @@ use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Prophecy\PhpUnit\ProphecyTrait;
 use Prophecy\Prophecy\ObjectProphecy;
+use Sulu\Article\Domain\Repository\ArticleRepositoryInterface;
 use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Component\Security\Authorization\SecurityCheckerInterface;
 use Sulu\Component\Webspace\Manager\WebspaceCollection;
@@ -39,10 +40,11 @@ use Sulu\Mcp\Application\Search\WebsiteSearch;
 use Sulu\Mcp\Application\Security\ToolPermissionChecker;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeContentTypeExtension;
 use Sulu\Mcp\Tests\Unit\Fixture\TestUser;
+use Sulu\Page\Domain\Repository\PageRepositoryInterface;
 
 #[CoversClass(ContentSearch::class)]
 final class ContentSearchTest extends TestCase
@@ -58,8 +60,6 @@ final class ContentSearchTest extends TestCase
     /** @var ObjectProphecy<ToolPermissionCheckerInterface> */
     private ObjectProphecy $permissionChecker;
 
-    private ArticleSecurityContextResolver $articleContextResolver;
-
     private ContentSearch $contentSearch;
 
     protected function setUp(): void
@@ -67,20 +67,31 @@ final class ContentSearchTest extends TestCase
         $this->engine = $this->prophesize(EngineInterface::class);
         $this->searcher = $this->prophesize(SearcherInterface::class);
         $this->permissionChecker = $this->prophesize(ToolPermissionCheckerInterface::class);
-        $this->articleContextResolver = new ArticleSecurityContextResolver(TestGroupProvider::singleGroup());
         $this->permissionChecker->has('sulu.article.articles', PermissionTypes::VIEW, 'en')->willReturn(true);
         // Grants EDIT on 'example' so existing happy-path tests are unaffected by the webspace filter.
         // No extensions registered by default, so $permissionChecker->has() is never reached
         // (the extension loop is empty) and needs no stub.
-        $this->contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([]), $this->articleContextResolver);
+        $this->contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), $this->registry());
     }
 
     /**
      * Real WebspacePermissionResolver (final) over a mocked WebspaceManagerInterface
      * and a real ToolPermissionChecker driven by a mocked SecurityCheckerInterface.
-     *
-     * @param list<string> $grantedWebspaceKeys webspace keys on which EDIT is granted
      */
+    /**
+     * @param list<\Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface> $extensions
+     */
+    private function registry(array $extensions = []): ContentTypeExtensionRegistry
+    {
+        return ContentTypes::registry(
+            $this->prophesize(PageRepositoryInterface::class)->reveal(),
+            $this->prophesize(ArticleRepositoryInterface::class)->reveal(),
+            TestGroupProvider::singleGroup(),
+            null,
+            $extensions,
+        );
+    }
+
     private function webspaceResolver(array $grantedWebspaceKeys): WebspacePermissionResolver
     {
         $webspaces = [];
@@ -137,7 +148,7 @@ final class ContentSearchTest extends TestCase
             ->shouldBeCalledOnce()
             ->willReturn($this->createEmptyResult());
 
-        $result = $this->contentSearch->search('hello', 'en', null, 'article');
+        $result = $this->contentSearch->search('hello', 'en', null, 'articles');
 
         $this->assertArrayHasKey('results', $result);
         $this->assertArrayHasKey('total', $result);
@@ -165,7 +176,7 @@ final class ContentSearchTest extends TestCase
             ->shouldBeCalledOnce()
             ->willReturn($this->createEmptyResult());
 
-        $this->contentSearch->search('hello', 'en', null, 'page');
+        $this->contentSearch->search('hello', 'en', null, 'pages');
     }
 
     public function testUnknownTypeIsRejected(): void
@@ -177,7 +188,7 @@ final class ContentSearchTest extends TestCase
         $this->assertSame(
             [
                 'error' => 'Unsupported content type "custom_type".',
-                'hint' => 'Supported: page, article.',
+                'hint' => 'Supported: pages, articles.',
             ],
             $result,
         );
@@ -225,7 +236,7 @@ final class ContentSearchTest extends TestCase
 
     public function testSearchReturnsEmptyResultsWhenNoWebspaceIsPermitted(): void
     {
-        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver([]), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([]), $this->articleContextResolver);
+        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver([]), $this->permissionChecker->reveal(), $this->registry());
 
         $this->engine->createSearchBuilder(Argument::cetera())->shouldNotBeCalled();
 
@@ -239,7 +250,7 @@ final class ContentSearchTest extends TestCase
 
     public function testSearchReturnsEmptyResultsWhenRequestedWebspaceIsNotPermitted(): void
     {
-        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([]), $this->articleContextResolver);
+        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), $this->registry());
 
         $this->engine->createSearchBuilder(Argument::cetera())->shouldNotBeCalled();
 
@@ -255,7 +266,7 @@ final class ContentSearchTest extends TestCase
     {
         $builder = $this->createSearchBuilder();
 
-        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example', 'blog']), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([]), $this->articleContextResolver);
+        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example', 'blog']), $this->permissionChecker->reveal(), $this->registry());
 
         $this->engine->createSearchBuilder('website')->willReturn($builder);
 
@@ -282,7 +293,7 @@ final class ContentSearchTest extends TestCase
     {
         $builder = $this->createSearchBuilder();
 
-        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example', 'blog']), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([]), $this->articleContextResolver);
+        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example', 'blog']), $this->permissionChecker->reveal(), $this->registry());
 
         $this->engine->createSearchBuilder('website')->willReturn($builder);
 
@@ -312,7 +323,7 @@ final class ContentSearchTest extends TestCase
         $this->engine->createSearchBuilder('website')->willReturn($builder);
         $this->permissionChecker->has('sulu.widget.widgets', PermissionTypes::VIEW, 'en')->willReturn(false);
 
-        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([new FakeContentTypeExtension()]), $this->articleContextResolver);
+        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), $this->registry([new FakeContentTypeExtension()]));
 
         $this->searcher
             ->search(Argument::that(function(Search $search): bool {
@@ -340,7 +351,7 @@ final class ContentSearchTest extends TestCase
         $this->engine->createSearchBuilder('website')->willReturn($builder);
         $this->permissionChecker->has('sulu.widget.widgets', PermissionTypes::VIEW, 'en')->willReturn(true);
 
-        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([new FakeContentTypeExtension()]), $this->articleContextResolver);
+        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), $this->registry([new FakeContentTypeExtension()]));
 
         $this->searcher
             ->search(Argument::that(function(Search $search): bool {
@@ -372,7 +383,7 @@ final class ContentSearchTest extends TestCase
         $this->assertSame(
             [
                 'error' => 'Unsupported content type "widgets".',
-                'hint' => 'Supported: page, article.',
+                'hint' => 'Supported: pages, articles.',
             ],
             $result,
         );
@@ -382,7 +393,7 @@ final class ContentSearchTest extends TestCase
     {
         $this->permissionChecker->has('sulu.widget.widgets', PermissionTypes::VIEW, 'en')->willReturn(false);
 
-        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([new FakeContentTypeExtension()]), $this->articleContextResolver);
+        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), $this->registry([new FakeContentTypeExtension()]));
 
         $this->engine->createSearchBuilder(Argument::cetera())->shouldNotBeCalled();
 
@@ -404,7 +415,7 @@ final class ContentSearchTest extends TestCase
         $this->engine->createSearchBuilder('website')->willReturn($builder);
         $this->permissionChecker->has('sulu.widget.widgets', PermissionTypes::VIEW, 'en')->willReturn(true);
 
-        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), new ContentTypeExtensionRegistry([new FakeContentTypeExtension()]), $this->articleContextResolver);
+        $contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), $this->registry([new FakeContentTypeExtension()]));
 
         $this->searcher
             ->search(Argument::that(function(Search $search): bool {
@@ -431,12 +442,12 @@ final class ContentSearchTest extends TestCase
 
         $this->engine->createSearchBuilder(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->contentSearch->search('hello', 'en', null, 'article');
+        $result = $this->contentSearch->search('hello', 'en', null, 'articles');
 
         $this->assertSame(
             [
                 'error' => 'Permission denied: no accessible security context grants the required permissions.',
-                'hint' => 'Requires VIEW on "sulu.article.articles" (or the matching article group context).',
+                'hint' => 'Requires VIEW on "sulu.article.articles".',
             ],
             $result,
         );

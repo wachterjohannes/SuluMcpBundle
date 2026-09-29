@@ -18,11 +18,11 @@ use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 /**
  * Stands in for a bundle like SuluProductBundle, proving the extension point works
  * end to end (container wiring, tagging, discovery) without SuluMcpBundle depending
- * on a real one. Deliberately named "widget", not "product".
+ * on a real one. Deliberately named "widgets", not "products".
  */
 final class WidgetContentTypeExtension implements ContentTypeExtensionInterface
 {
-    public function getType(): string
+    public function getTemplateType(): string
     {
         return 'widget';
     }
@@ -32,9 +32,33 @@ final class WidgetContentTypeExtension implements ContentTypeExtensionInterface
         return 'widgets';
     }
 
-    public function getSecurityContext(): string
+    public function getViewSecurityContexts(): array
+    {
+        return ['sulu.mcp_test.widgets'];
+    }
+
+    public function getEntitySecurityContext(object $aggregate, ?string $templateKey): string
     {
         return 'sulu.mcp_test.widgets';
+    }
+
+    public function requiresResolvedContent(): bool
+    {
+        return false;
+    }
+
+    public function getAclObjectType(): ?string
+    {
+        return null;
+    }
+
+    public function getWebspaceKey(object $aggregate): ?string
+    {
+        return null;
+    }
+
+    public function assertCanRemove(string $uuid): void
+    {
     }
 
     public function loadDraft(string $uuid, string $locale, bool $loadGhost = false): ?object

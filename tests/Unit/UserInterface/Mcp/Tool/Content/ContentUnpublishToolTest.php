@@ -23,11 +23,8 @@ use Prophecy\Prophecy\ObjectProphecy;
 use Sulu\Article\Domain\Model\Article;
 use Sulu\Article\Domain\Repository\ArticleRepositoryInterface;
 use Sulu\Content\Application\ContentManager\ContentManagerInterface;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
-use Sulu\Mcp\Application\Content\ContentTypeResolver;
-use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeToolPermissionChecker;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Content\ContentUnpublishTool;
 use Sulu\Messenger\Infrastructure\Symfony\Messenger\FlushMiddleware\EnableFlushStamp;
@@ -75,16 +72,16 @@ final class ContentUnpublishToolTest extends TestCase
 
         $this->tool = new ContentUnpublishTool(
             $this->messageBus->reveal(),
-            new ContentTypeResolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::resolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), $groupProvider),
             $this->contentManager->reveal(),
             $this->permissionChecker,
-            new ContentSecurityContextResolver(new ArticleSecurityContextResolver($groupProvider), $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::securityResolver($this->contentManager->reveal(), $groupProvider),
         );
     }
 
     public function testUnpublishSnippetDispatchesTransition(): void
     {
-        $this->setupEntity('snippet');
+        $this->setupEntity('snippets');
 
         $captured = new \stdClass();
         $this->messageBus->dispatch(Argument::cetera())
@@ -95,7 +92,7 @@ final class ContentUnpublishToolTest extends TestCase
                 return $args[0]->with(new HandledStamp(null, 'handler'));
             });
 
-        $result = $this->tool->unpublishContent('snippet', 'uuid-1', 'en');
+        $result = $this->tool->unpublishContent('snippets', 'uuid-1', 'en');
 
         $this->assertInstanceOf(ApplyWorkflowTransitionSnippetMessage::class, $captured->envelope->getMessage());
         $this->assertArrayHasKey(EnableFlushStamp::class, $captured->envelope->all());
@@ -113,7 +110,7 @@ final class ContentUnpublishToolTest extends TestCase
         $this->snippetRepository->getOneBy(Argument::cetera())->willThrow(new \RuntimeException('not found'));
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->unpublishContent('snippet', 'missing-uuid', 'en');
+        $result = $this->tool->unpublishContent('snippets', 'missing-uuid', 'en');
 
         $this->assertArrayHasKey('error', $result);
     }
@@ -126,7 +123,7 @@ final class ContentUnpublishToolTest extends TestCase
 
     public function testUnpublishContentThrowsToolCallExceptionWhenPermissionDenied(): void
     {
-        $this->setupEntity('snippet');
+        $this->setupEntity('snippets');
 
         $this->permissionChecker->denyAll();
 
@@ -134,14 +131,14 @@ final class ContentUnpublishToolTest extends TestCase
 
         $this->expectException(ToolCallException::class);
 
-        $this->tool->unpublishContent('snippet', 'uuid-1', 'en');
+        $this->tool->unpublishContent('snippets', 'uuid-1', 'en');
     }
 
     private function setupEntity(string $type): void
     {
         $entity = match ($type) {
-            'article' => new Article('uuid-1'),
-            'snippet' => new Snippet('uuid-1'),
+            'articles' => new Article('uuid-1'),
+            'snippets' => new Snippet('uuid-1'),
             default => (static function(): Page {
                 $page = new Page('uuid-1');
                 $page->setWebspaceKey('example');
@@ -151,12 +148,12 @@ final class ContentUnpublishToolTest extends TestCase
         };
 
         match ($type) {
-            'article' => $this->articleRepository->getOneBy(Argument::cetera())->willReturn($entity),
-            'snippet' => $this->snippetRepository->getOneBy(Argument::cetera())->willReturn($entity),
+            'articles' => $this->articleRepository->getOneBy(Argument::cetera())->willReturn($entity),
+            'snippets' => $this->snippetRepository->getOneBy(Argument::cetera())->willReturn($entity),
             default => $this->pageRepository->getOneBy(Argument::cetera())->willReturn($entity),
         };
 
-        if ('article' === $type) {
+        if ('articles' === $type) {
             $dimensionContent = new PageDimensionContent(new Page());
             $dimensionContent->setTemplateKey('default');
             $this->contentManager->resolve(Argument::cetera())->willReturn($dimensionContent);

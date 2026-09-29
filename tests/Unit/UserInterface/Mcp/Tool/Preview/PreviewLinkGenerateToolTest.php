@@ -26,11 +26,9 @@ use Sulu\Article\Domain\Repository\ArticleRepositoryInterface;
 use Sulu\Bundle\PreviewBundle\Application\Manager\PreviewLinkManagerInterface;
 use Sulu\Bundle\PreviewBundle\Domain\Model\PreviewLink;
 use Sulu\Content\Application\ContentManager\ContentManagerInterface;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
-use Sulu\Mcp\Application\Content\ContentTypeResolver;
-use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
+use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeToolPermissionChecker;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Preview\PreviewLinkGenerateTool;
 use Sulu\Page\Domain\Model\Page;
@@ -78,16 +76,16 @@ final class PreviewLinkGenerateToolTest extends TestCase
         $this->tool = new PreviewLinkGenerateTool(
             $this->previewLinkManager->reveal(),
             $this->router->reveal(),
-            new ContentTypeResolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $snippetRepository->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::resolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $snippetRepository->reveal(), $groupProvider),
             $this->contentManager->reveal(),
             $this->permissionChecker,
-            new ContentSecurityContextResolver(new ArticleSecurityContextResolver($groupProvider), $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::securityResolver($this->contentManager->reveal(), $groupProvider),
         );
     }
 
     private function setupEntity(string $type): void
     {
-        if ('page' === $type) {
+        if ('pages' === $type) {
             $page = new Page('page-uuid-1');
             $page->setWebspaceKey('example');
             $this->pageRepository->getOneBy(Argument::cetera())->willReturn($page);
@@ -102,7 +100,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
 
     public function testGeneratePreviewLinkForPage(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $previewLink = new PreviewLink('abc123', 'pages', 'page-uuid-1', 'en', ['webspaceKey' => 'example']);
 
@@ -116,7 +114,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
             ->shouldBeCalledOnce()
             ->willReturn('https://example.com/preview/abc123');
 
-        $result = $this->tool->generatePreviewLink('page', 'page-uuid-1', 'en', 'example');
+        $result = $this->tool->generatePreviewLink('pages', 'page-uuid-1', 'en', 'example');
 
         $this->assertTrue($result['success']);
         $this->assertSame('https://example.com/preview/abc123', $result['preview_url']);
@@ -128,7 +126,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
 
     public function testGeneratePreviewLinkForArticle(): void
     {
-        $this->setupEntity('article');
+        $this->setupEntity('articles');
 
         $previewLink = new PreviewLink('def456', 'articles', 'article-uuid-1', 'de', ['webspaceKey' => 'sulu']);
 
@@ -142,7 +140,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
             ->shouldBeCalledOnce()
             ->willReturn('https://example.com/preview/def456');
 
-        $result = $this->tool->generatePreviewLink('article', 'article-uuid-1', 'de', 'sulu');
+        $result = $this->tool->generatePreviewLink('articles', 'article-uuid-1', 'de', 'sulu');
 
         $this->assertTrue($result['success']);
         $this->assertSame('https://example.com/preview/def456', $result['preview_url']);
@@ -154,7 +152,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
 
     public function testTypeIsMappedToResourceKeyForGenerate(): void
     {
-        $this->setupEntity('article');
+        $this->setupEntity('articles');
 
         $previewLink = new PreviewLink('tok', 'articles', 'article-uuid-1', 'en', ['webspaceKey' => 'example']);
 
@@ -169,7 +167,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
 
         $this->router->generate(Argument::cetera())->willReturn('https://example.com/preview/tok');
 
-        $this->tool->generatePreviewLink('article', 'article-uuid-1', 'en', 'example');
+        $this->tool->generatePreviewLink('articles', 'article-uuid-1', 'en', 'example');
 
         $this->assertSame('articles', $capturedResourceKey, 'Singular "article" must be mapped to plural "articles" before calling the manager.');
     }
@@ -178,7 +176,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
     {
         $this->previewLinkManager->generate(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->generatePreviewLink('article', 'article-uuid-1', 'en');
+        $result = $this->tool->generatePreviewLink('articles', 'article-uuid-1', 'en');
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('webspace', $result['error']);
@@ -187,7 +185,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
 
     public function testGeneratePreviewLinkPassesWebspaceInOptions(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $previewLink = new PreviewLink('tok', 'pages', 'uuid-1', 'en', ['webspaceKey' => 'example']);
 
@@ -198,7 +196,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
 
         $this->router->generate(Argument::cetera())->willReturn('https://example.com/preview/tok');
 
-        $this->tool->generatePreviewLink('page', 'uuid-1', 'en', 'example');
+        $this->tool->generatePreviewLink('pages', 'uuid-1', 'en', 'example');
     }
 
     /**
@@ -207,24 +205,24 @@ final class PreviewLinkGenerateToolTest extends TestCase
      */
     public function testGeneratePreviewLinkRejectsForeignRenderingWebspace(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->previewLinkManager->generate(Argument::cetera())->shouldNotBeCalled();
 
         $this->expectException(ToolCallException::class);
 
-        $this->tool->generatePreviewLink('page', 'uuid-1', 'en', 'other-webspace');
+        $this->tool->generatePreviewLink('pages', 'uuid-1', 'en', 'other-webspace');
     }
 
     public function testGeneratePreviewLinkReturnsErrorOnException(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->previewLinkManager
             ->generate(Argument::cetera())
             ->willThrow(new \RuntimeException('Resource not found'));
 
-        $result = $this->tool->generatePreviewLink('page', 'bad-uuid', 'en', 'example');
+        $result = $this->tool->generatePreviewLink('pages', 'bad-uuid', 'en', 'example');
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('Resource not found', $result['error']);
@@ -236,14 +234,14 @@ final class PreviewLinkGenerateToolTest extends TestCase
         $this->pageRepository->getOneBy(Argument::cetera())->willThrow(new \RuntimeException('not found'));
         $this->previewLinkManager->generate(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->generatePreviewLink('page', 'missing-uuid', 'en', 'example');
+        $result = $this->tool->generatePreviewLink('pages', 'missing-uuid', 'en', 'example');
 
         $this->assertArrayHasKey('error', $result);
     }
 
     public function testGeneratePreviewLinkThrowsToolCallExceptionWhenPermissionDenied(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->permissionChecker->denyAll();
 
@@ -251,7 +249,7 @@ final class PreviewLinkGenerateToolTest extends TestCase
 
         $this->expectException(ToolCallException::class);
 
-        $this->tool->generatePreviewLink('page', 'page-uuid-1', 'en', 'example');
+        $this->tool->generatePreviewLink('pages', 'page-uuid-1', 'en', 'example');
     }
 
     public function testMethodHasMcpToolAttribute(): void
@@ -265,16 +263,16 @@ final class PreviewLinkGenerateToolTest extends TestCase
         $this->assertSame('sulu_preview_link_generate', $instance->name);
     }
 
-    public function testTypeParameterHasSchemaAttributeWithSingularEnum(): void
+    public function testResourceKeyParameterHasSchemaAttributeWithResourceKeyPlaceholder(): void
     {
         $reflection = new \ReflectionMethod(PreviewLinkGenerateTool::class, 'generatePreviewLink');
         $parameter = $reflection->getParameters()[0];
-        $this->assertSame('type', $parameter->getName());
+        $this->assertSame('resourceKey', $parameter->getName());
 
         $attributes = $parameter->getAttributes(Schema::class);
         $this->assertCount(1, $attributes);
 
         $schema = $attributes[0]->newInstance();
-        $this->assertSame(['page', 'article'], $schema->enum);
+        $this->assertSame([ContentTypeSchemaExpander::RESOURCE_KEYS], $schema->enum);
     }
 }

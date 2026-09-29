@@ -22,6 +22,7 @@ use Sulu\Mcp\Application\Content\BlockDataValidator;
 use Sulu\Mcp\Application\Content\ContentMetadataMapper;
 use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
+use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Application\Media\MediaDownloader;
 use Sulu\Mcp\Application\Media\MediaFileNamer;
 use Sulu\Mcp\Application\Media\MediaSourceUrlResolver;
@@ -49,6 +50,8 @@ use Sulu\Mcp\Infrastructure\Sulu\AdminLink\MediaAdminLinkProvider;
 use Sulu\Mcp\Infrastructure\Sulu\AdminLink\PageAdminLinkProvider;
 use Sulu\Mcp\Infrastructure\Sulu\AdminLink\SnippetAdminLinkProvider;
 use Sulu\Mcp\Infrastructure\Sulu\AdminLink\TagAdminLinkProvider;
+use Sulu\Mcp\Infrastructure\Sulu\Content\ArticleContentTypeExtension;
+use Sulu\Mcp\Infrastructure\Sulu\Content\PageContentTypeExtension;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ContactSecurityContextResolver;
 use Sulu\Mcp\Infrastructure\Sulu\Security\EntryPoint\OAuthAuthorizeEntryPoint;
@@ -149,11 +152,16 @@ return static function(ContainerConfigurator $container): void {
         ->decorate('mcp.server.sulu.registry')
         ->arg('$inner', new Reference('.inner'))
         ->arg('$visibilityResolver', new Reference(ToolVisibilityResolver::class))
+        ->arg('$schemaExpander', new Reference(ContentTypeSchemaExpander::class))
         ->arg('$disabledToolNames', '%sulu_mcp.disabled_tool_names%');
 
     $services->set(ToolPermissionChecker::class);
     $services->alias(ToolPermissionCheckerInterface::class, ToolPermissionChecker::class);
     $services->set(WebspacePermissionResolver::class);
+
+    // Pages and articles are extensions like any other, tagged by the instanceof rule above.
+    $services->set(PageContentTypeExtension::class);
+    $services->set(ArticleContentTypeExtension::class);
 
     // Collects every ContentTypeExtensionInterface tagged service, however it got tagged
     // (autoconfigured here, or tagged explicitly by a bundle wiring its own services file).
@@ -300,13 +308,14 @@ return static function(ContainerConfigurator $container): void {
     $services->set(PageMoveTool::class);
     $services->set(PageReorderTool::class);
 
-    // Unified content tools (page | article | snippet via `type`)
+    // Unified content tools (any registered resourceKey via `resourceKey`)
     $services->set(ContentDeleteTool::class);
     $services->set(ContentPublishTool::class);
     $services->set(ContentUnpublishTool::class);
 
     // Block management tools
     $services->set(ContentTypeResolver::class);
+    $services->set(ContentTypeSchemaExpander::class);
     $services->set(ContentMetadataMapper::class)
         ->arg('$formMetadataProvider', new Reference('sulu_admin.form_metadata_provider'));
     $services->set(BlockDataValidator::class)

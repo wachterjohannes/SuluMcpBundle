@@ -28,12 +28,9 @@ use Sulu\Bundle\SecurityBundle\System\SystemStoreInterface;
 use Sulu\Component\Security\Authorization\AccessControl\AccessControlRepositoryInterface;
 use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Content\Application\ContentManager\ContentManagerInterface;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
-use Sulu\Mcp\Application\Content\ContentTypeResolver;
-use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Application\Security\PageDescendantPermissionChecker;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeToolPermissionChecker;
 use Sulu\Mcp\Tests\Unit\Fixture\TestUser;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Content\ContentDeleteTool;
@@ -103,17 +100,16 @@ final class ContentDeleteToolTest extends TestCase
 
         $this->tool = new ContentDeleteTool(
             $this->messageBus->reveal(),
-            new ContentTypeResolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::resolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), $groupProvider, $pageDescendantPermissionChecker),
             $this->contentManager->reveal(),
             $this->permissionChecker,
-            new ContentSecurityContextResolver(new ArticleSecurityContextResolver($groupProvider), $this->contentManager->reveal(), new ContentTypeExtensionRegistry([])),
-            $pageDescendantPermissionChecker,
+            ContentTypes::securityResolver($this->contentManager->reveal(), $groupProvider),
         );
     }
 
     public function testDeletePageDispatchesRemovePageMessageWithFlushStamp(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->security->getUser(Argument::cetera())->willReturn(new TestUser());
         $this->pageRepository->findDescendantIdsById(Argument::cetera())->willReturn([]);
@@ -127,17 +123,17 @@ final class ContentDeleteToolTest extends TestCase
                 return $args[0]->with(new HandledStamp(null, 'handler'));
             });
 
-        $result = $this->tool->deleteContent('page', 'uuid-1', 'en', true);
+        $result = $this->tool->deleteContent('pages', 'uuid-1', 'en', true);
 
         $this->assertInstanceOf(Envelope::class, $captured);
         $this->assertInstanceOf(RemovePageMessage::class, $captured->getMessage());
         $this->assertArrayHasKey(EnableFlushStamp::class, $captured->all());
-        $this->assertSame(['success' => true, 'type' => 'page', 'uuid' => 'uuid-1', 'deleted' => true], $result);
+        $this->assertSame(['success' => true, 'resourceKey' => 'pages', 'uuid' => 'uuid-1', 'deleted' => true], $result);
     }
 
     public function testDeleteSnippetDispatchesRemoveSnippetMessage(): void
     {
-        $this->setupEntity('snippet');
+        $this->setupEntity('snippets');
 
         $captured = null;
         $this->messageBus->dispatch(Argument::cetera())
@@ -148,7 +144,7 @@ final class ContentDeleteToolTest extends TestCase
                 return $args[0]->with(new HandledStamp(null, 'handler'));
             });
 
-        $result = $this->tool->deleteContent('snippet', 'uuid-2', 'en');
+        $result = $this->tool->deleteContent('snippets', 'uuid-2', 'en');
 
         $this->assertInstanceOf(Envelope::class, $captured);
         $this->assertInstanceOf(RemoveSnippetMessage::class, $captured->getMessage());
@@ -157,7 +153,7 @@ final class ContentDeleteToolTest extends TestCase
 
     public function testDeleteArticleDispatchesRemoveArticleMessage(): void
     {
-        $this->setupEntity('article');
+        $this->setupEntity('articles');
 
         $captured = null;
         $this->messageBus->dispatch(Argument::cetera())
@@ -168,7 +164,7 @@ final class ContentDeleteToolTest extends TestCase
                 return $args[0]->with(new HandledStamp(null, 'handler'));
             });
 
-        $result = $this->tool->deleteContent('article', 'uuid-3', 'en');
+        $result = $this->tool->deleteContent('articles', 'uuid-3', 'en');
 
         $this->assertInstanceOf(Envelope::class, $captured);
         $this->assertInstanceOf(RemoveArticleMessage::class, $captured->getMessage());
@@ -190,17 +186,17 @@ final class ContentDeleteToolTest extends TestCase
         $this->articleRepository->getOneBy(Argument::cetera())->willThrow(new \RuntimeException('not found'));
         $this->messageBus->dispatch(Argument::cetera())->shouldNotBeCalled();
 
-        $result = $this->tool->deleteContent('article', 'missing-uuid', 'en');
+        $result = $this->tool->deleteContent('articles', 'missing-uuid', 'en');
 
         $this->assertArrayHasKey('error', $result);
     }
 
     public function testErrorOnException(): void
     {
-        $this->setupEntity('article');
+        $this->setupEntity('articles');
         $this->messageBus->dispatch(Argument::cetera())->willThrow(new \RuntimeException('boom'));
 
-        $result = $this->tool->deleteContent('article', 'uuid-1', 'en');
+        $result = $this->tool->deleteContent('articles', 'uuid-1', 'en');
 
         $this->assertStringContainsString('boom', $result['error']);
     }
@@ -214,7 +210,7 @@ final class ContentDeleteToolTest extends TestCase
 
     public function testDeleteContentThrowsToolCallExceptionWhenPermissionDenied(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->permissionChecker->denyAll();
 
@@ -222,12 +218,12 @@ final class ContentDeleteToolTest extends TestCase
 
         $this->expectException(ToolCallException::class);
 
-        $this->tool->deleteContent('page', 'uuid-1', 'en');
+        $this->tool->deleteContent('pages', 'uuid-1', 'en');
     }
 
     public function testDeletePageThrowsToolCallExceptionWhenDescendantPermissionDenied(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->security->getUser(Argument::cetera())->willReturn(new TestUser());
         $this->pageRepository->findDescendantIdsById(Argument::cetera())->willReturn(['child-1', 'child-2']);
@@ -238,7 +234,7 @@ final class ContentDeleteToolTest extends TestCase
 
         $this->expectException(ToolCallException::class);
 
-        $this->tool->deleteContent('page', 'uuid-1', 'en', true);
+        $this->tool->deleteContent('pages', 'uuid-1', 'en', true);
     }
 
     public function testDeleteContentPassesConcretePageClassAsObjectTypeForBothChecks(): void
@@ -246,14 +242,14 @@ final class ContentDeleteToolTest extends TestCase
         // Regression guard: Sulu stores per-page ACLs under the concrete Page class
         // (getSecuredClass()), not PageInterface — the interface matches no ACL row and
         // falls back to the webspace grant, for both the EDIT and DELETE check.
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->security->getUser(Argument::cetera())->willReturn(new TestUser());
         $this->pageRepository->findDescendantIdsById(Argument::cetera())->willReturn([]);
         $this->messageBus->dispatch(Argument::cetera())
             ->will(fn (array $args) => $args[0]->with(new HandledStamp(null, 'handler')));
 
-        $result = $this->tool->deleteContent('page', 'uuid-1', 'en');
+        $result = $this->tool->deleteContent('pages', 'uuid-1', 'en');
 
         $this->assertTrue($result['deleted']);
         $this->assertSame(
@@ -266,7 +262,7 @@ final class ContentDeleteToolTest extends TestCase
 
     public function testDeletePageDispatchesWhenAllDescendantsGranted(): void
     {
-        $this->setupEntity('page');
+        $this->setupEntity('pages');
 
         $this->security->getUser(Argument::cetera())->willReturn(new TestUser());
         $this->pageRepository->findDescendantIdsById(Argument::cetera())->willReturn(['child-1', 'child-2']);
@@ -276,7 +272,7 @@ final class ContentDeleteToolTest extends TestCase
             ->shouldBeCalledOnce()
             ->will(fn (array $args) => $args[0]->with(new HandledStamp(null, 'handler')));
 
-        $result = $this->tool->deleteContent('page', 'uuid-1', 'en', true);
+        $result = $this->tool->deleteContent('pages', 'uuid-1', 'en', true);
 
         $this->assertTrue($result['deleted']);
     }
@@ -284,18 +280,18 @@ final class ContentDeleteToolTest extends TestCase
     private function setupEntity(string $type): void
     {
         $entity = match ($type) {
-            'article' => new Article('uuid-1'),
-            'snippet' => new Snippet('uuid-1'),
+            'articles' => new Article('uuid-1'),
+            'snippets' => new Snippet('uuid-1'),
             default => (new Page('uuid-1'))->setWebspaceKey('example'),
         };
 
         match ($type) {
-            'article' => $this->articleRepository->getOneBy(Argument::cetera())->willReturn($entity),
-            'snippet' => $this->snippetRepository->getOneBy(Argument::cetera())->willReturn($entity),
+            'articles' => $this->articleRepository->getOneBy(Argument::cetera())->willReturn($entity),
+            'snippets' => $this->snippetRepository->getOneBy(Argument::cetera())->willReturn($entity),
             default => $this->pageRepository->getOneBy(Argument::cetera())->willReturn($entity),
         };
 
-        if ('article' === $type) {
+        if ('articles' === $type) {
             $dimensionContent = new ArticleDimensionContent($entity);
             $dimensionContent->setTemplateKey('default');
             $this->contentManager->resolve(Argument::cetera())->willReturn($dimensionContent);

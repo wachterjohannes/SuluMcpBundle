@@ -23,6 +23,7 @@ use Sulu\Content\Application\ContentManager\ContentManagerInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
+use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
@@ -31,15 +32,12 @@ use Sulu\Mcp\Domain\Security\DangerousTool;
 use Sulu\Mcp\Domain\Security\PermissionRequirement;
 use Sulu\Mcp\Domain\Security\RequiresPermission;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
-use Sulu\Page\Domain\Model\Page;
 
 /**
  * @internal
  */
 class PreviewLinkRevokeTool
 {
-    private const TYPE_MAP = ['page' => 'pages', 'article' => 'articles'];
-
     public function __construct(
         private readonly PreviewLinkManagerInterface $previewLinkManager,
         private readonly ContentTypeResolver $contentTypeResolver,
@@ -55,7 +53,7 @@ class PreviewLinkRevokeTool
     #[McpTool(
         name: 'sulu_preview_link_revoke',
         title: 'Revoke Preview Link',
-        description: 'Revoke/invalidate a previously generated public preview link for a page or article. After revoking, the preview URL will no longer work. Pass `type` as "page" or "article" (the same singular values used by the other tools). If no preview link exists for the resource, the operation returns an error — verify a link exists with sulu_preview_link_generate before revoking.',
+        description: 'Revoke/invalidate a previously generated public preview link for a content entity. After revoking, the preview URL will no longer work. Pass `resourceKey` as one of {resourceKeys}. If no preview link exists for the resource, the operation returns an error — verify a link exists with sulu_preview_link_generate before revoking.',
         annotations: new ToolAnnotations(readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false),
     )]
     #[DangerousTool('publish')]
@@ -65,38 +63,38 @@ class PreviewLinkRevokeTool
         discoveryContexts: [ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT, WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT],
     )]
     public function revokePreviewLink(
-        #[Schema(description: 'Content type to preview: "page" or "article" (same singular values used by the other tools).', enum: ['page', 'article'])]
-        string $type,
+        #[Schema(description: 'The resourceKey of the content type to preview: {resourceKeys}.', enum: [ContentTypeSchemaExpander::RESOURCE_KEYS])]
+        string $resourceKey,
         string $uuid,
         string $locale,
     ): array {
         try {
-            $entity = $this->contentTypeResolver->loadDraft($type, $uuid, $locale);
+            $entity = $this->contentTypeResolver->loadDraft($resourceKey, $uuid, $locale);
             if (null === $entity) {
                 return [
-                    'error' => \sprintf('%s not found: %s', $type, $uuid),
+                    'error' => \sprintf('%s not found: %s', $resourceKey, $uuid),
                     'hint' => 'Verify the type ("page"/"article"), uuid and locale.',
                 ];
             }
 
-            $dimensionContent = 'article' === $type
+            $extension = $this->contentTypeResolver->get($resourceKey);
+            $dimensionContent = $extension->requiresResolvedContent()
                 ? $this->contentManager->resolve($entity, ['locale' => $locale, 'stage' => DimensionContentInterface::STAGE_DRAFT]) // @phpstan-ignore argument.type, argument.templateType (upstream generic is invariant; loadDraft() returns a bare object)
                 : null;
 
             // Preview links are gated on EDIT, stricter than the admin UI's VIEW.
             $this->permissionChecker->check(
                 $this->contentSecurityContextResolver->forEntity(
-                    $type,
+                    $resourceKey,
                     $entity,
                     $dimensionContent instanceof TemplateInterface ? $dimensionContent : null,
                 ),
                 PermissionTypes::EDIT,
                 $locale,
-                'page' === $type ? Page::class : null,
-                'page' === $type ? $uuid : null,
+                $extension->getAclObjectType(),
+                null !== $extension->getAclObjectType() ? $uuid : null,
             );
 
-            $resourceKey = self::TYPE_MAP[$type] ?? $type;
             $this->previewLinkManager->revoke($resourceKey, $uuid, $locale);
 
             return [

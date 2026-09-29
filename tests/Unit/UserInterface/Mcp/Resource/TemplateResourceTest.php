@@ -22,10 +22,11 @@ use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataInterface;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
+use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Application\Metadata\FieldNormalizer;
 use Sulu\Mcp\Application\Metadata\MetadataLocaleResolver;
 use Sulu\Mcp\Tests\Unit\Fixture\ArrayMetadataProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeContentTypeExtension;
 use Sulu\Mcp\UserInterface\Mcp\Resource\TemplatesResource;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
@@ -41,7 +42,7 @@ final class TemplateResourceTest extends TestCase
     protected function setUp(): void
     {
         $this->formMetadataProvider = new ArrayMetadataProvider();
-        $this->resource = new TemplatesResource($this->formMetadataProvider, new FieldNormalizer(), new MetadataLocaleResolver(new TokenStorage(), 'en'), new ContentTypeExtensionRegistry([]));
+        $this->resource = new TemplatesResource($this->formMetadataProvider, new FieldNormalizer(), new MetadataLocaleResolver(new TokenStorage(), 'en'), ContentTypes::inertResolver());
     }
 
     public function testGetTemplatesReturnsTemplatesGroupedByContentType(): void
@@ -60,10 +61,10 @@ final class TemplateResourceTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $this->assertArrayHasKey('page', $result);
-        $this->assertArrayHasKey('default', $result['page']);
-        $this->assertArrayHasKey('fields', $result['page']['default']);
-        $this->assertIsArray($result['page']['default']['fields']);
+        $this->assertArrayHasKey('pages', $result);
+        $this->assertArrayHasKey('default', $result['pages']);
+        $this->assertArrayHasKey('fields', $result['pages']['default']);
+        $this->assertIsArray($result['pages']['default']['fields']);
     }
 
     public function testGetTemplatesFieldIncludesNameTypeLabel(): void
@@ -83,7 +84,7 @@ final class TemplateResourceTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $fields = $result['page']['default']['fields'];
+        $fields = $result['pages']['default']['fields'];
         $this->assertCount(1, $fields);
         $this->assertArrayHasKey('name', $fields[0]);
         $this->assertArrayHasKey('type', $fields[0]);
@@ -117,11 +118,11 @@ final class TemplateResourceTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $this->assertSame(['page', 'article', 'snippet'], \array_keys($result));
-        $this->assertArrayHasKey('default', $result['page']);
-        $this->assertArrayHasKey('blog', $result['article']);
-        $this->assertArrayHasKey('teaser', $result['snippet']);
-        $this->assertSame('headline', $result['article']['blog']['fields'][0]['name']);
+        $this->assertSame(['pages', 'articles', 'snippets'], \array_keys($result));
+        $this->assertArrayHasKey('default', $result['pages']);
+        $this->assertArrayHasKey('blog', $result['articles']);
+        $this->assertArrayHasKey('teaser', $result['snippets']);
+        $this->assertSame('headline', $result['articles']['blog']['fields'][0]['name']);
     }
 
     public function testGetTemplatesIncludesARegisteredExtensionType(): void
@@ -130,7 +131,7 @@ final class TemplateResourceTest extends TestCase
             $this->formMetadataProvider,
             new FieldNormalizer(),
             new MetadataLocaleResolver(new TokenStorage(), 'en'),
-            new ContentTypeExtensionRegistry([new FakeContentTypeExtension()]),
+            ContentTypes::inertResolver([new FakeContentTypeExtension()]),
         );
 
         $field = new FieldMetadata('title');
@@ -145,8 +146,8 @@ final class TemplateResourceTest extends TestCase
 
         $result = $resource->getTemplates();
 
-        $this->assertArrayHasKey('widget', $result);
-        $this->assertArrayHasKey('default', $result['widget']);
+        $this->assertArrayHasKey('widgets', $result);
+        $this->assertArrayHasKey('default', $result['widgets']);
     }
 
     public function testGetTemplatesOmitsContentTypesWithoutMetadata(): void
@@ -163,7 +164,7 @@ final class TemplateResourceTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $this->assertSame(['page'], \array_keys($result));
+        $this->assertSame(['pages'], \array_keys($result));
     }
 
     public function testGetTemplatesMethodHasMcpResourceAttribute(): void
@@ -194,9 +195,8 @@ final class TemplateResourceTest extends TestCase
         $reflection = new \ReflectionMethod(TemplatesResource::class, 'getTemplates');
         $attribute = $reflection->getAttributes(McpResource::class)[0]->newInstance();
 
-        $this->assertStringContainsString('page', $attribute->description);
-        $this->assertStringContainsString('article', $attribute->description);
-        $this->assertStringContainsString('snippet', $attribute->description);
+        $this->assertStringContainsString('resourceKey', $attribute->description);
+        $this->assertStringContainsString(ContentTypeSchemaExpander::CONTENT_RESOURCE_KEYS, $attribute->description);
     }
 
     public function testGetTemplatesFlattensSectionFieldsWithoutSectionEntry(): void
@@ -224,7 +224,7 @@ final class TemplateResourceTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $fields = $result['page']['default']['fields'];
+        $fields = $result['pages']['default']['fields'];
         $this->assertSame(['title', 'subtitle'], \array_column($fields, 'name'));
         $this->assertNotContains('section', \array_column($fields, 'type'));
     }
@@ -257,7 +257,7 @@ final class TemplateResourceTest extends TestCase
 
         $result = $this->resource->getTemplates();
 
-        $fields = $result['page']['default']['fields'];
+        $fields = $result['pages']['default']['fields'];
         $this->assertSame('blocks', $fields[0]['name']);
         $this->assertArrayHasKey('types', $fields[0]);
         $this->assertSame('headline', $fields[0]['types']['default']['fields'][0]['name']);

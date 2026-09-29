@@ -26,11 +26,10 @@ use Sulu\Article\Domain\Repository\ArticleRepositoryInterface;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormGroup;
 use Sulu\Content\Application\ContentManager\ContentManagerInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
-use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
-use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
+use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeToolPermissionChecker;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Block\BlockListTool;
 use Sulu\Page\Domain\Model\Page;
@@ -64,9 +63,9 @@ final class BlockListToolTest extends TestCase
         $this->contentManager = $this->prophesize(ContentManagerInterface::class);
         $this->permissionChecker = FakeToolPermissionChecker::grantingAll();
         $groupProvider = new TestGroupProvider([]);
-        $this->contentSecurityContextResolver = new ContentSecurityContextResolver(new ArticleSecurityContextResolver($groupProvider), $this->contentManager->reveal(), new ContentTypeExtensionRegistry([]));
+        $this->contentSecurityContextResolver = ContentTypes::securityResolver($this->contentManager->reveal(), $groupProvider);
         $this->tool = new BlockListTool(
-            new ContentTypeResolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::resolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), $groupProvider),
             $this->contentManager->reveal(),
             $this->permissionChecker,
             $this->contentSecurityContextResolver,
@@ -83,7 +82,7 @@ final class BlockListToolTest extends TestCase
             ['_id' => 'e', 'type' => 'text', 'title' => 'Block 5', 'description' => '<p>Content 5</p>'],
         ]);
 
-        $result = $this->tool->listBlocks('page', 'test-uuid', 'en', 'blocks', 1, 3);
+        $result = $this->tool->listBlocks('pages', 'test-uuid', 'en', 'blocks', 1, 3);
 
         $this->assertSame(5, $result['total']);
         $this->assertSame(1, $result['page']);
@@ -104,7 +103,7 @@ final class BlockListToolTest extends TestCase
             ['_id' => 'e', 'type' => 'text', 'title' => 'Block 5'],
         ]);
 
-        $result = $this->tool->listBlocks('page', 'test-uuid', 'en', 'blocks', 2, 3);
+        $result = $this->tool->listBlocks('pages', 'test-uuid', 'en', 'blocks', 2, 3);
 
         $this->assertSame(5, $result['total']);
         $this->assertSame(2, $result['page']);
@@ -120,7 +119,7 @@ final class BlockListToolTest extends TestCase
             ['_id' => 'a', 'type' => 'text', 'title' => 'Block 1', 'settings' => [], 'description' => ''],
         ]);
 
-        $result = $this->tool->listBlocks('page', 'test-uuid', 'en', 'blocks', 1, 10);
+        $result = $this->tool->listBlocks('pages', 'test-uuid', 'en', 'blocks', 1, 10);
 
         $this->assertCount(1, $result['blocks']);
         $this->assertArrayNotHasKey('settings', $result['blocks'][0]);
@@ -133,7 +132,7 @@ final class BlockListToolTest extends TestCase
             ['_id' => 'a', 'type' => 'text'],
         ]);
 
-        $result = $this->tool->listBlocks('page', 'test-uuid', 'en', 'nonexistent', 1, 10);
+        $result = $this->tool->listBlocks('pages', 'test-uuid', 'en', 'nonexistent', 1, 10);
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('nonexistent', $result['error']);
@@ -144,7 +143,7 @@ final class BlockListToolTest extends TestCase
     {
         $this->pageRepository->getOneBy(Argument::cetera())->willThrow(new \RuntimeException('Not found'));
 
-        $result = $this->tool->listBlocks('page', 'missing-uuid', 'en', 'blocks');
+        $result = $this->tool->listBlocks('pages', 'missing-uuid', 'en', 'blocks');
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('missing-uuid', $result['error']);
@@ -172,7 +171,7 @@ final class BlockListToolTest extends TestCase
             ],
         ]);
 
-        $result = $this->tool->listBlocks('article', 'article-uuid', 'en', 'blocks');
+        $result = $this->tool->listBlocks('articles', 'article-uuid', 'en', 'blocks');
 
         $this->assertSame(1, $result['total']);
         $this->assertSame('x', $result['blocks'][0]['_id']);
@@ -199,7 +198,7 @@ final class BlockListToolTest extends TestCase
 
         $this->expectException(ToolCallException::class);
 
-        $this->tool->listBlocks('page', 'test-uuid', 'en', 'blocks');
+        $this->tool->listBlocks('pages', 'test-uuid', 'en', 'blocks');
     }
 
     /**
@@ -233,7 +232,7 @@ final class BlockListToolTest extends TestCase
         $ghostDimensionContent->addAvailableLocale('de');
         $this->contentManager->resolve(Argument::cetera())->willReturn($ghostDimensionContent);
 
-        $result = $this->tool->listBlocks('page', 'uuid-1', 'en', 'blocks');
+        $result = $this->tool->listBlocks('pages', 'uuid-1', 'en', 'blocks');
 
         $this->assertArrayHasKey('error', $result);
         $this->assertStringContainsString('has no "en" content yet', $result['error']);
@@ -265,20 +264,16 @@ final class BlockListToolTest extends TestCase
             ->grantContext('sulu.article.articles_blog');
 
         $tool = new BlockListTool(
-            new ContentTypeResolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal(), new ContentTypeExtensionRegistry([])),
+            ContentTypes::resolver($this->pageRepository->reveal(), $this->articleRepository->reveal(), $this->snippetRepository->reveal()),
             $this->contentManager->reveal(),
             $permissionChecker,
-            new ContentSecurityContextResolver(
-                new ArticleSecurityContextResolver(new TestGroupProvider([
-                    (new FormGroup('default', 'Default'))->withTemplate('default'),
-                    (new FormGroup('blog', 'Blog'))->withTemplate('blog_article'),
-                ])),
-                $this->contentManager->reveal(),
-                new ContentTypeExtensionRegistry([]),
-            ),
+            ContentTypes::securityResolver($this->contentManager->reveal(), new TestGroupProvider([
+                (new FormGroup('default', 'Default'))->withTemplate('default'),
+                (new FormGroup('blog', 'Blog'))->withTemplate('blog_article'),
+            ])),
         );
 
-        $result = $tool->listBlocks('article', 'article-uuid', 'en', 'blocks');
+        $result = $tool->listBlocks('articles', 'article-uuid', 'en', 'blocks');
 
         $this->assertSame(['sulu.article.articles_blog'], $permissionChecker->checkedContexts());
         $this->assertArrayHasKey('error', $result);

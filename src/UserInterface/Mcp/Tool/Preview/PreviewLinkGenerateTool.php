@@ -23,6 +23,7 @@ use Sulu\Content\Application\ContentManager\ContentManagerInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
+use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
@@ -30,8 +31,6 @@ use Sulu\Mcp\Domain\Exception\PermissionDeniedException;
 use Sulu\Mcp\Domain\Security\PermissionRequirement;
 use Sulu\Mcp\Domain\Security\RequiresPermission;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
-use Sulu\Page\Domain\Model\Page;
-use Sulu\Page\Domain\Model\PageInterface;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
@@ -41,8 +40,6 @@ use Symfony\Component\Routing\RouterInterface;
  */
 class PreviewLinkGenerateTool
 {
-    private const TYPE_MAP = ['page' => 'pages', 'article' => 'articles'];
-
     public function __construct(
         private readonly PreviewLinkManagerInterface $previewLinkManager,
         private readonly RouterInterface $router,
@@ -59,7 +56,7 @@ class PreviewLinkGenerateTool
     #[McpTool(
         name: 'sulu_preview_link_generate',
         title: 'Generate Preview Link',
-        description: 'Generate a shareable public preview URL for a draft page or article. Returns a token-protected URL under /admin/p/<token> that reviewers can open without a CMS login. The `webspace` parameter is REQUIRED for both pages and articles -- Sulu\'s preview renderer needs to know which webspace context (theme, routes, templates) to render the preview under, and articles that aren\'t scoped to a webspace at generation time produce a token that crashes when opened. Use sulu_ping or sulu_get_context to list the available webspaces. Pass `type` as "page" or "article" (the same singular values used by the other tools).',
+        description: 'Generate a shareable public preview URL for a draft content entity. Returns a token-protected URL under /admin/p/<token> that reviewers can open without a CMS login. The `webspace` parameter is REQUIRED for every resource key -- Sulu\'s preview renderer needs to know which webspace context (theme, routes, templates) to render the preview under, and articles that aren\'t scoped to a webspace at generation time produce a token that crashes when opened. Use sulu_ping or sulu_get_context to list the available webspaces. Pass `resourceKey` as one of {resourceKeys}.',
         annotations: new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
     )]
     #[RequiresPermission(
@@ -68,8 +65,8 @@ class PreviewLinkGenerateTool
         discoveryContexts: [ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT, WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT],
     )]
     public function generatePreviewLink(
-        #[Schema(description: 'Content type to preview: "page" or "article" (same singular values used by the other tools).', enum: ['page', 'article'])]
-        string $type,
+        #[Schema(description: 'The resourceKey of the content type to preview: {resourceKeys}.', enum: [ContentTypeSchemaExpander::RESOURCE_KEYS])]
+        string $resourceKey,
         string $uuid,
         string $locale,
         ?string $webspace = null,
@@ -82,39 +79,40 @@ class PreviewLinkGenerateTool
         }
 
         try {
-            $entity = $this->contentTypeResolver->loadDraft($type, $uuid, $locale);
+            $entity = $this->contentTypeResolver->loadDraft($resourceKey, $uuid, $locale);
             if (null === $entity) {
                 return [
-                    'error' => \sprintf('%s not found: %s', $type, $uuid),
+                    'error' => \sprintf('%s not found: %s', $resourceKey, $uuid),
                     'hint' => 'Verify the type ("page"/"article"), uuid and locale.',
                 ];
             }
 
-            $dimensionContent = 'article' === $type
+            $extension = $this->contentTypeResolver->get($resourceKey);
+            $dimensionContent = $extension->requiresResolvedContent()
                 ? $this->contentManager->resolve($entity, ['locale' => $locale, 'stage' => DimensionContentInterface::STAGE_DRAFT]) // @phpstan-ignore argument.type, argument.templateType (upstream generic is invariant; loadDraft() returns a bare object)
                 : null;
 
             // Preview links are gated on EDIT, stricter than the admin UI's VIEW.
             $this->permissionChecker->check(
                 $this->contentSecurityContextResolver->forEntity(
-                    $type,
+                    $resourceKey,
                     $entity,
                     $dimensionContent instanceof TemplateInterface ? $dimensionContent : null,
                 ),
                 PermissionTypes::EDIT,
                 $locale,
-                'page' === $type ? Page::class : null,
-                'page' === $type ? $uuid : null,
+                $extension->getAclObjectType(),
+                null !== $extension->getAclObjectType() ? $uuid : null,
             );
 
             // The token is rendered later under this webspace's portal/theme/routes, so
             // it is a context the caller must be allowed to use -- not just a label.
-            if ('page' === $type && $entity instanceof PageInterface && $webspace !== $entity->getWebspaceKey()) {
+            $entityWebspace = $extension->getWebspaceKey($entity);
+            if (null !== $entityWebspace && $webspace !== $entityWebspace) {
                 throw new PermissionDeniedException('sulu.webspaces.' . $webspace, PermissionTypes::EDIT, $locale);
             }
             $this->permissionChecker->check('sulu.webspaces.' . $webspace, PermissionTypes::EDIT, $locale);
 
-            $resourceKey = self::TYPE_MAP[$type] ?? $type;
             $options = ['webspaceKey' => $webspace];
 
             $previewLink = $this->previewLinkManager->generate($resourceKey, $uuid, $locale, $options);

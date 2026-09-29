@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Sulu\Mcp\UserInterface\Mcp\Tool\Content;
 
 use Mcp\Capability\Attribute\McpTool;
+use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
 use Sulu\Component\Security\Authorization\PermissionTypes;
@@ -22,6 +23,7 @@ use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
 use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
+use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Application\Security\ContentSecurityContextResolver;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
@@ -31,7 +33,6 @@ use Sulu\Mcp\Domain\Security\PermissionRequirement;
 use Sulu\Mcp\Domain\Security\RequiresPermission;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Messenger\Infrastructure\Symfony\Messenger\FlushMiddleware\EnableFlushStamp;
-use Sulu\Page\Domain\Model\Page;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\HandleTrait;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -59,7 +60,7 @@ class ContentUnpublishTool
     #[McpTool(
         name: 'sulu_content_unpublish',
         title: 'Unpublish Content',
-        description: 'Unpublish a live page, article, snippet, or any type a bundle registers — removes it from the website but keeps the draft. Set "type" to "page", "article", "snippet", or another registered type. A registered type may cascade the unpublish to related entities; check that type\'s own tools if unsure. The content is preserved and can be re-published later with sulu_content_publish. Use this to take content offline without deleting it.',
+        description: 'Unpublish a live content entity: removes it from the website but keeps the draft. Set "resourceKey" to one of {contentResourceKeys}. A resource key a bundle registers may cascade the unpublish to related entities; check that type\'s own tools if unsure. The content is preserved and can be re-published later with sulu_content_publish. Use this to take content offline without deleting it.',
         annotations: new ToolAnnotations(readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false),
     )]
     #[DangerousTool('publish')]
@@ -71,29 +72,34 @@ class ContentUnpublishTool
         objectResolved: true,
         discoveryContexts: ['sulu.snippet.snippets', ContentTypeExtensionRegistry::ANY_EXTENSION_CONTEXT, ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT, WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT],
     )]
-    public function unpublishContent(string $type, string $uuid, string $locale): array
-    {
-        if (!$this->contentTypeResolver->supports($type)) {
+    public function unpublishContent(
+        #[Schema(description: 'The resourceKey of the content type: {contentResourceKeys}.', enum: [ContentTypeSchemaExpander::CONTENT_RESOURCE_KEYS])]
+        string $resourceKey,
+        string $uuid,
+        string $locale,
+    ): array {
+        if (!$this->contentTypeResolver->supports($resourceKey)) {
             return [
-                'error' => \sprintf('Unsupported content type "%s".', $type),
-                'hint' => \sprintf('Supported types: %s.', \implode(', ', $this->contentTypeResolver->supportedTypes())),
+                'error' => \sprintf('Unsupported content type "%s".', $resourceKey),
+                'hint' => \sprintf('Supported types: %s.', \implode(', ', $this->contentTypeResolver->supportedResourceKeys())),
             ];
         }
 
         try {
-            $entity = $this->contentTypeResolver->loadForTransition($type, $uuid, $locale);
+            $entity = $this->contentTypeResolver->loadForTransition($resourceKey, $uuid, $locale);
             if (null === $entity) {
                 return [
-                    'error' => \sprintf('%s not found: %s', \ucfirst($type), $uuid),
-                    'hint' => \sprintf('Verify the UUID exists (use sulu_%s_get).', $type),
+                    'error' => \sprintf('%s not found: %s', \ucfirst($resourceKey), $uuid),
+                    'hint' => 'Verify the UUID and resourceKey are correct (use the matching get tool, e.g. sulu_page_get).',
                 ];
             }
 
-            $dimensionContent = 'article' === $type
+            $extension = $this->contentTypeResolver->get($resourceKey);
+            $dimensionContent = $extension->requiresResolvedContent()
                 ? $this->contentManager->resolve($entity, ['locale' => $locale, 'stage' => DimensionContentInterface::STAGE_DRAFT]) // @phpstan-ignore argument.type, argument.templateType (upstream generic is invariant; loadForTransition() returns a bare object)
                 : null;
             $context = $this->contentSecurityContextResolver->forEntity(
-                $type,
+                $resourceKey,
                 $entity,
                 $dimensionContent instanceof TemplateInterface ? $dimensionContent : null,
             );
@@ -102,17 +108,17 @@ class ContentUnpublishTool
                 $context,
                 [PermissionTypes::EDIT, PermissionTypes::LIVE],
                 $locale,
-                'page' === $type ? Page::class : null,
-                'page' === $type ? $uuid : null,
+                $extension->getAclObjectType(),
+                null !== $extension->getAclObjectType() ? $uuid : null,
             );
 
-            $message = $this->contentTypeResolver->createTransitionMessage($type, $uuid, $locale, 'unpublish');
+            $message = $this->contentTypeResolver->createTransitionMessage($resourceKey, $uuid, $locale, 'unpublish');
 
             $this->handle(new Envelope($message, [new EnableFlushStamp()]));
 
             return [
                 'success' => true,
-                'type' => $type,
+                'resourceKey' => $resourceKey,
                 'uuid' => $uuid,
                 'action' => 'unpublished',
                 'locale' => $locale,
@@ -121,8 +127,8 @@ class ContentUnpublishTool
             throw new ToolCallException($e->getMessage(), 0, $e);
         } catch (\Throwable $e) {
             return [
-                'error' => \sprintf('Failed to unpublish %s %s: %s', $type, $uuid, $e->getMessage()),
-                'hint' => \sprintf('Verify the content exists and is currently published (use sulu_%s_get to check workflowPlace).', $type),
+                'error' => \sprintf('Failed to unpublish %s %s: %s', $resourceKey, $uuid, $e->getMessage()),
+                'hint' => 'Verify the content exists and is currently published (use the matching get tool, e.g. sulu_page_get, to check workflowPlace).',
             ];
         }
     }
