@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace Sulu\Mcp\Application\AdminLink;
 
 /**
- * Port for building admin deeplinks, implemented in Infrastructure.
- *
- * @internal
+ * Port for building admin deeplinks, implemented in Infrastructure. Usable by a bundle
+ * implementing ContentTypeExtensionInterface, so its own tools can return an admin link
+ * the same way the built-in ones do.
  */
 interface AdminLinkGeneratorInterface
 {

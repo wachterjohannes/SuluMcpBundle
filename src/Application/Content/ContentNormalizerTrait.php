@@ -17,7 +17,8 @@ namespace Sulu\Mcp\Application\Content;
  * Strips empty/null values and unnecessary metadata from Sulu's normalized content
  * to keep MCP responses small enough for AI clients.
  *
- * @internal
+ * Usable by a bundle implementing ContentTypeExtensionInterface, whose own tools return
+ * the same normalized content shape.
  */
 trait ContentNormalizerTrait
 {
