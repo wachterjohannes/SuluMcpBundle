@@ -57,7 +57,7 @@
     },
     "suggest": {
         "sulu/product-bundle": "Enables the sulu_product_* MCP tools and type=\"product\" on the unified content tools",
-        "symfony/ai-agent": "Exposes sulu_content_search as an agent tool for symfony/ai-agent, in addition to MCP; with sulu/product-bundle also installed, enables sulu_product_get_products and sulu_product_search_products_by_attributes"
+        "symfony/ai-agent": "Exposes sulu_content_search as an agent tool for symfony/ai-agent, in addition to MCP"
     },
     "autoload": {
         "psr-4": {
@@ -79,7 +79,7 @@
         ],
         "test-with-product": [
             "Composer\\Config::disableProcessTimeout",
-            "vendor/bin/phpunit --exclude-group ai-agent"
+            "vendor/bin/phpunit"
         ],
         "test-with-coverage": "@test --coverage-php var/reports/coverage.cov --coverage-cobertura=var/cobertura-coverage.xml --coverage-html var/reports/html --log-junit var/reports/junit.xml",
         "bootstrap-test-environment": [

@@ -19,6 +19,7 @@ use Sulu\Mcp\Application\Search\ContentSearch;
 use Sulu\Mcp\Infrastructure\Sulu\AdminLink\ProductAdminLinkProvider;
 use Sulu\Mcp\Infrastructure\Sulu\AdminLink\ProductVariantAdminLinkProvider;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\AttributeListTool;
+use Sulu\Mcp\UserInterface\Mcp\Tool\Product\GetProductsTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductCreateTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductFamilyListTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductGetTool;
@@ -27,6 +28,7 @@ use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductUpdateTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductVariantCreateTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductVariantListTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductVariantUpdateTool;
+use Sulu\Mcp\UserInterface\Mcp\Tool\Product\SearchProductsByAttributesTool;
 use Sulu\Product\Domain\Repository\ProductRepositoryInterface;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -67,4 +69,7 @@ return static function(ContainerConfigurator $container): void {
 
     $services->set(ProductFamilyListTool::class);
     $services->set(AttributeListTool::class);
+
+    $services->set(GetProductsTool::class);
+    $services->set(SearchProductsByAttributesTool::class);
 };

@@ -19,20 +19,21 @@ use Mcp\Schema\ToolAnnotations;
 use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Mcp\Domain\Security\PermissionRequirement;
 use Sulu\Mcp\Domain\Security\RequiresPermission;
+use Sulu\Product\Application\Ai\SearchProductsByAttributes;
 use Sulu\Product\Infrastructure\Sulu\Admin\ProductAdmin;
-use Sulu\Product\Infrastructure\Symfony\Ai\Tool\SearchProductsByAttributesTool as ProductSearchProductsByAttributesTool;
 
 /**
- * MCP adapter for SuluProductBundle's own `sulu_product_search_products_by_attributes`
- * #[AsTool]: same name, behavior and result shape, callable over MCP as well as
- * symfony/ai-agent.
+ * MCP adapter for SuluProductBundle's own product search/lookup logic
+ * (Application\Ai\SearchProductsByAttributes): same behavior and result shape as the
+ * `sulu_product_search_products_by_attributes` symfony/ai-agent tool, but wired here without
+ * requiring symfony/ai-agent to be installed.
  *
  * @internal
  */
 class SearchProductsByAttributesTool
 {
     public function __construct(
-        private readonly ProductSearchProductsByAttributesTool $tool,
+        private readonly SearchProductsByAttributes $searchProductsByAttributes,
     ) {
     }
 
@@ -74,6 +75,6 @@ class SearchProductsByAttributesTool
         #[Schema(description: 'Maximum number of results to return, capped at 25.')]
         int $limit = 10,
     ): array {
-        return ($this->tool)($locale, $filters, $includeVariants, $limit);
+        return ($this->searchProductsByAttributes)($locale, $filters, $includeVariants, $limit);
     }
 }

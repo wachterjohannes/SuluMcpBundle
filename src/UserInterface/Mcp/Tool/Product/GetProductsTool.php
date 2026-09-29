@@ -19,19 +19,20 @@ use Mcp\Schema\ToolAnnotations;
 use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Mcp\Domain\Security\PermissionRequirement;
 use Sulu\Mcp\Domain\Security\RequiresPermission;
+use Sulu\Product\Application\Ai\GetProducts;
 use Sulu\Product\Infrastructure\Sulu\Admin\ProductAdmin;
-use Sulu\Product\Infrastructure\Symfony\Ai\Tool\GetProductsTool as ProductGetProductsTool;
 
 /**
- * MCP adapter for SuluProductBundle's own `sulu_product_get_products` #[AsTool]: same name,
- * behavior and result shape, callable over MCP as well as symfony/ai-agent.
+ * MCP adapter for SuluProductBundle's own product search/lookup logic (Application\Ai\GetProducts):
+ * same behavior and result shape as the `sulu_product_get_products` symfony/ai-agent tool, but
+ * wired here without requiring symfony/ai-agent to be installed.
  *
  * @internal
  */
 class GetProductsTool
 {
     public function __construct(
-        private readonly ProductGetProductsTool $tool,
+        private readonly GetProducts $getProducts,
     ) {
     }
 
@@ -62,6 +63,6 @@ class GetProductsTool
         #[Schema(description: 'Maximum number of results to return, capped at 25.')]
         int $limit = 10,
     ): array {
-        return ($this->tool)($locale, $query, $productFamily, $includeVariants, $limit);
+        return ($this->getProducts)($locale, $query, $productFamily, $includeVariants, $limit);
     }
 }

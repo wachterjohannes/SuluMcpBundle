@@ -19,14 +19,14 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Prophecy\PhpUnit\ProphecyTrait;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\SearchProductsByAttributesTool;
+use Sulu\Product\Application\Ai\SearchProductsByAttributes;
 use Sulu\Product\Domain\Repository\AttributeRepositoryInterface;
 use Sulu\Product\Domain\Repository\ProductRepositoryInterface;
-use Sulu\Product\Infrastructure\Symfony\Ai\Tool\SearchProductsByAttributesTool as ProductSearchProductsByAttributesTool;
 
 /**
- * ProductSearchProductsByAttributesTool (final, so Prophecy can't double it directly) is real
- * here, built over mocked repositories. It never gets called with no filters, so this only has
- * to prove the adapter threads its arguments through, not repeat its own tests.
+ * SearchProductsByAttributes (final, so Prophecy can't double it directly) is real here, built
+ * over mocked repositories. It never gets called with no filters, so this only has to prove the
+ * adapter threads its arguments through, not repeat its own tests.
  */
 #[CoversClass(SearchProductsByAttributesTool::class)]
 #[Group('product')]
@@ -34,11 +34,11 @@ final class SearchProductsByAttributesToolTest extends TestCase
 {
     use ProphecyTrait;
 
-    public function testSearchDelegatesToTheOriginalTool(): void
+    public function testSearchDelegatesToSearchProductsByAttributes(): void
     {
         $productRepository = $this->prophesize(ProductRepositoryInterface::class);
         $attributeRepository = $this->prophesize(AttributeRepositoryInterface::class);
-        $tool = new SearchProductsByAttributesTool(new ProductSearchProductsByAttributesTool(
+        $tool = new SearchProductsByAttributesTool(new SearchProductsByAttributes(
             $productRepository->reveal(),
             $attributeRepository->reveal(),
         ));

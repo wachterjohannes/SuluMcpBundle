@@ -19,13 +19,13 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Prophecy\PhpUnit\ProphecyTrait;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\GetProductsTool;
+use Sulu\Product\Application\Ai\GetProducts;
 use Sulu\Product\Domain\Repository\ProductRepositoryInterface;
-use Sulu\Product\Infrastructure\Symfony\Ai\Tool\GetProductsTool as ProductGetProductsTool;
 
 /**
- * ProductGetProductsTool (final, so Prophecy can't double it directly) is real here, built
- * over a mocked repository. It never gets called without a query or productFamily, so this
- * only has to prove the adapter threads its arguments through, not repeat its own tests.
+ * GetProducts (final, so Prophecy can't double it directly) is real here, built over a mocked
+ * repository. It never gets called without a query or productFamily, so this only has to prove
+ * the adapter threads its arguments through, not repeat its own tests.
  */
 #[CoversClass(GetProductsTool::class)]
 #[Group('product')]
@@ -33,10 +33,10 @@ final class GetProductsToolTest extends TestCase
 {
     use ProphecyTrait;
 
-    public function testSearchDelegatesToTheOriginalTool(): void
+    public function testSearchDelegatesToGetProducts(): void
     {
         $productRepository = $this->prophesize(ProductRepositoryInterface::class);
-        $tool = new GetProductsTool(new ProductGetProductsTool($productRepository->reveal()));
+        $tool = new GetProductsTool(new GetProducts($productRepository->reveal()));
 
         $result = $tool->search('en');
 
