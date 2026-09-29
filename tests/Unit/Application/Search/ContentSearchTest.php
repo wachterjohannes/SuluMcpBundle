@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace Sulu\Mcp\Tests\Unit\Application\Search;
 
-use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 use CmsIg\Seal\Adapter\SearcherInterface;
 use CmsIg\Seal\EngineInterface;
 use CmsIg\Seal\Schema\Field\IdentifierField;
@@ -41,6 +40,7 @@ use Sulu\Mcp\Application\Search\WebsiteSearch;
 use Sulu\Mcp\Application\Security\ToolPermissionChecker;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
+use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
 use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeContentTypeExtension;
