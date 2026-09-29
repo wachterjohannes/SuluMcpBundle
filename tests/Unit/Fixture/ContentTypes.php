@@ -26,13 +26,14 @@ use Sulu\Mcp\Application\Security\PageDescendantPermissionChecker;
 use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 use Sulu\Mcp\Infrastructure\Sulu\Content\ArticleContentTypeExtension;
 use Sulu\Mcp\Infrastructure\Sulu\Content\PageContentTypeExtension;
+use Sulu\Mcp\Infrastructure\Sulu\Content\SnippetContentTypeExtension;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Tests\Application\TestBundle\Metadata\TestGroupProvider;
 use Sulu\Page\Domain\Repository\PageRepositoryInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 
 /**
- * Builds the real content type resolvers over test doubles: pages and articles are built-in
+ * Builds the real content type resolvers over test doubles: pages, articles and snippets are built-in
  * extensions, so tools are tested against them rather than against stand-ins.
  *
  * @internal
@@ -50,7 +51,7 @@ final class ContentTypes
         ?PageDescendantPermissionChecker $pageDescendantChecker = null,
         array $extensions = [],
     ): ContentTypeResolver {
-        return new ContentTypeResolver($snippetRepository, self::registry($pageRepository, $articleRepository, $groupProvider, $pageDescendantChecker, $extensions));
+        return new ContentTypeResolver(self::registry($pageRepository, $articleRepository, $groupProvider, $pageDescendantChecker, $extensions, $snippetRepository));
     }
 
     /**
@@ -62,10 +63,12 @@ final class ContentTypes
         GroupProviderInterface|ArticleSecurityContextResolver|null $groupProvider = null,
         ?PageDescendantPermissionChecker $pageDescendantChecker = null,
         array $extensions = [],
+        ?SnippetRepositoryInterface $snippetRepository = null,
     ): ContentTypeExtensionRegistry {
         return new ContentTypeExtensionRegistry([
             new PageContentTypeExtension($pageRepository, $pageDescendantChecker ?? self::descendantChecker($pageRepository)),
             new ArticleContentTypeExtension($articleRepository, $groupProvider instanceof ArticleSecurityContextResolver ? $groupProvider : new ArticleSecurityContextResolver($groupProvider ?? new TestGroupProvider([]))),
+            new SnippetContentTypeExtension($snippetRepository ?? (new Prophet())->prophesize(SnippetRepositoryInterface::class)->reveal()),
             ...$extensions,
         ]);
     }

@@ -182,7 +182,7 @@ final readonly class PermissionAwareCallToolHandler implements RequestHandlerInt
      */
     private function anyExtensionGrants(string $permission, ?string $locale): bool
     {
-        foreach ($this->extensionRegistry->all() as $extension) {
+        foreach ($this->extensionRegistry->searchable() as $extension) {
             foreach ($extension->getViewSecurityContexts() as $context) {
                 if ($this->permissionChecker->has($context, $permission, $locale)) {
                     return true;

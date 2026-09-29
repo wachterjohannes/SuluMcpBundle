@@ -52,6 +52,7 @@ use Sulu\Mcp\Infrastructure\Sulu\AdminLink\SnippetAdminLinkProvider;
 use Sulu\Mcp\Infrastructure\Sulu\AdminLink\TagAdminLinkProvider;
 use Sulu\Mcp\Infrastructure\Sulu\Content\ArticleContentTypeExtension;
 use Sulu\Mcp\Infrastructure\Sulu\Content\PageContentTypeExtension;
+use Sulu\Mcp\Infrastructure\Sulu\Content\SnippetContentTypeExtension;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ContactSecurityContextResolver;
 use Sulu\Mcp\Infrastructure\Sulu\Security\EntryPoint\OAuthAuthorizeEntryPoint;
@@ -159,9 +160,10 @@ return static function(ContainerConfigurator $container): void {
     $services->alias(ToolPermissionCheckerInterface::class, ToolPermissionChecker::class);
     $services->set(WebspacePermissionResolver::class);
 
-    // Pages and articles are extensions like any other, tagged by the instanceof rule above.
+    // Pages, articles and snippets are extensions like any other, tagged by the instanceof rule above.
     $services->set(PageContentTypeExtension::class);
     $services->set(ArticleContentTypeExtension::class);
+    $services->set(SnippetContentTypeExtension::class);
 
     // Collects every ContentTypeExtensionInterface tagged service, however it got tagged
     // (autoconfigured here, or tagged explicitly by a bundle wiring its own services file).

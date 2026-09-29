@@ -29,7 +29,6 @@ use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Component\Security\Authorization\SecurityCheckerInterface;
 use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
-use Sulu\Mcp\Application\Content\ContentTypeResolver;
 use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Application\Security\ToolPermissionChecker;
 use Sulu\Mcp\Application\Security\ToolVisibilityResolver;
@@ -41,7 +40,6 @@ use Sulu\Mcp\Tests\Unit\Fixture\ContentTypes;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeContentTypeExtension;
 use Sulu\Mcp\Tests\Unit\Fixture\FakeToolPermissionChecker;
 use Sulu\Page\Domain\Repository\PageRepositoryInterface;
-use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 
 #[CoversClass(FilteredRegistry::class)]
@@ -67,7 +65,7 @@ final class FilteredRegistryTest extends TestCase
             [new FakeContentTypeExtension()],
         );
 
-        return new ContentTypeSchemaExpander($registry, new ContentTypeResolver($this->prophesize(SnippetRepositoryInterface::class)->reveal(), $registry));
+        return new ContentTypeSchemaExpander($registry);
     }
 
     private function placeholderTool(string $name = 'sulu_content_delete'): Tool
@@ -248,9 +246,9 @@ final class FilteredRegistryTest extends TestCase
 
         $tool = $registry->getTool('sulu_content_delete')->tool;
 
-        self::assertSame('Works on "pages", "articles", "widgets", content on "pages", "articles", "widgets", "snippets".', $tool->description);
-        self::assertSame(['pages', 'articles', 'widgets', 'snippets'], $tool->inputSchema['properties']['resourceKey']['enum']);
-        self::assertSame('One of "pages", "articles", "widgets", "snippets".', $tool->inputSchema['properties']['resourceKey']['description']);
+        self::assertSame('Works on "pages", "articles", "widgets", content on "pages", "articles", "snippets", "widgets".', $tool->description);
+        self::assertSame(['pages', 'articles', 'snippets', 'widgets'], $tool->inputSchema['properties']['resourceKey']['enum']);
+        self::assertSame('One of "pages", "articles", "snippets", "widgets".', $tool->inputSchema['properties']['resourceKey']['description']);
         self::assertSame(['pages', 'articles', 'widgets'], $tool->inputSchema['properties']['kind']['enum']);
     }
 
@@ -275,6 +273,6 @@ final class FilteredRegistryTest extends TestCase
         $reference = $registry->getResource('sulu://templates');
 
         self::assertInstanceOf(ResourceReference::class, $reference);
-        self::assertSame('Grouped by "pages", "articles", "widgets", "snippets".', $reference->resource->description);
+        self::assertSame('Grouped by "pages", "articles", "snippets", "widgets".', $reference->resource->description);
     }
 }

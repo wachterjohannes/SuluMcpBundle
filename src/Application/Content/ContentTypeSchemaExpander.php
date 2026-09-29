@@ -20,8 +20,9 @@ use Mcp\Schema\Tool;
  * are registered at runtime. A description or an `enum` cannot list them statically, because a
  * bundle plugs in its own type. The MCP registry applies this when it hands out a tool.
  *
- * Use {@see self::RESOURCE_KEYS} for tools working on the registered content types (search,
- * preview) and {@see self::CONTENT_RESOURCE_KEYS} for tools that also cover snippets.
+ * Use {@see self::RESOURCE_KEYS} for the search and preview tools, which skip content types
+ * marked {@see \Sulu\Mcp\Domain\Content\NotSearchableContentTypeInterface}, and
+ * {@see self::CONTENT_RESOURCE_KEYS} for the content and block tools, which cover every type.
  *
  * @phpstan-import-type ToolInputSchema from Tool
  *
@@ -30,19 +31,18 @@ use Mcp\Schema\Tool;
 final readonly class ContentTypeSchemaExpander
 {
     /**
-     * Expands to the registered resourceKeys, e.g. `"pages", "articles"`, and as a single
+     * Expands to the searchable resourceKeys, e.g. `"pages", "articles"`, and as a single
      * `enum` entry to one value per key.
      */
     public const RESOURCE_KEYS = '{resourceKeys}';
 
     /**
-     * Like {@see self::RESOURCE_KEYS}, plus the resourceKey of snippets.
+     * Like {@see self::RESOURCE_KEYS}, but for every registered content type, snippets included.
      */
     public const CONTENT_RESOURCE_KEYS = '{contentResourceKeys}';
 
     public function __construct(
         private ContentTypeExtensionRegistry $extensionRegistry,
-        private ContentTypeResolver $contentTypeResolver,
     ) {
     }
 
@@ -54,7 +54,7 @@ final readonly class ContentTypeSchemaExpander
 
         return \str_replace(
             [self::RESOURCE_KEYS, self::CONTENT_RESOURCE_KEYS],
-            [$this->quoted($this->extensionRegistry->resourceKeys()), $this->quoted($this->contentTypeResolver->supportedResourceKeys())],
+            [$this->quoted($this->extensionRegistry->searchableResourceKeys()), $this->quoted($this->extensionRegistry->resourceKeys())],
             $text,
         );
     }
@@ -81,9 +81,9 @@ final readonly class ContentTypeSchemaExpander
     {
         foreach ($schema as $key => $value) {
             if ('enum' === $key && [self::RESOURCE_KEYS] === $value) {
-                $schema[$key] = $this->extensionRegistry->resourceKeys();
+                $schema[$key] = $this->extensionRegistry->searchableResourceKeys();
             } elseif ('enum' === $key && [self::CONTENT_RESOURCE_KEYS] === $value) {
-                $schema[$key] = $this->contentTypeResolver->supportedResourceKeys();
+                $schema[$key] = $this->extensionRegistry->resourceKeys();
             } elseif ('description' === $key && \is_string($value)) {
                 $schema[$key] = $this->expandText($value);
             } elseif (\is_array($value)) {

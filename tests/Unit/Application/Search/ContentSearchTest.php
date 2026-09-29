@@ -390,6 +390,21 @@ final class ContentSearchTest extends TestCase
         );
     }
 
+    public function testTypeForSnippetsIsRejectedBecauseTheyAreNotSearchable(): void
+    {
+        $this->engine->createSearchBuilder(Argument::cetera())->shouldNotBeCalled();
+
+        $result = $this->contentSearch->search('hello', 'en', null, 'snippets');
+
+        $this->assertSame(
+            [
+                'error' => 'Unsupported content type "snippets".',
+                'hint' => 'Supported: pages, articles.',
+            ],
+            $result,
+        );
+    }
+
     public function testTypeForARegisteredExtensionIsDeniedWithoutItsPermission(): void
     {
         $this->permissionChecker->has('sulu.widget.widgets', PermissionTypes::VIEW, 'en')->willReturn(false);

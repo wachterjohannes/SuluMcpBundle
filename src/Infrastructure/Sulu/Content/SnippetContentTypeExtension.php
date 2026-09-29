@@ -16,19 +16,19 @@ namespace Sulu\Mcp\Infrastructure\Sulu\Content;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Infrastructure\Doctrine\DimensionContentQueryEnhancer;
 use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
+use Sulu\Mcp\Domain\Content\NotSearchableContentTypeInterface;
 use Sulu\Snippet\Application\Message\ApplyWorkflowTransitionSnippetMessage;
 use Sulu\Snippet\Application\Message\ModifySnippetMessage;
 use Sulu\Snippet\Application\Message\RemoveSnippetMessage;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 
 /**
- * Built-in extension for snippets. Not tagged: snippets are not part of the `website` search index
- * or previews, so the registry that drives those does not list them, only
- * {@see \Sulu\Mcp\Application\Content\ContentTypeResolver} does.
+ * Built-in extension for snippets. Snippets are not part of the `website` search index and have no
+ * preview, hence {@see NotSearchableContentTypeInterface}.
  *
  * @internal
  */
-final readonly class SnippetContentTypeExtension implements ContentTypeExtensionInterface
+final readonly class SnippetContentTypeExtension implements ContentTypeExtensionInterface, NotSearchableContentTypeInterface
 {
     public const SECURITY_CONTEXT = 'sulu.snippet.snippets';
 

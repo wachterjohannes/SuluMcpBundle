@@ -19,6 +19,7 @@ use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
 use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
+use Sulu\Mcp\Domain\Content\NotSearchableContentTypeInterface;
 
 /**
  * Keyword search over the `website` SEAL index, the logic behind the `sulu_content_search` MCP
@@ -67,7 +68,7 @@ final class ContentSearch
         // A type with no view contexts (pages) is governed by the webspace check above.
         // Every other type carries its own security context and needs an extra check here.
         $visibleResourceKeys = [];
-        foreach ($this->extensionRegistry->all() as $extension) {
+        foreach ($this->extensionRegistry->searchable() as $extension) {
             if ($this->canView($extension, $locale)) {
                 $visibleResourceKeys[] = $extension->getResourceKey();
             }
@@ -75,7 +76,7 @@ final class ContentSearch
 
         if (null !== $resourceKey && !\in_array($resourceKey, $visibleResourceKeys, true)) {
             $extension = $this->extensionRegistry->find($resourceKey);
-            if (null !== $extension) {
+            if (null !== $extension && !$extension instanceof NotSearchableContentTypeInterface) {
                 $contexts = \array_map(static fn (string $context): string => \sprintf('"%s"', $context), $extension->getViewSecurityContexts());
 
                 return [
@@ -86,7 +87,7 @@ final class ContentSearch
 
             return [
                 'error' => \sprintf('Unsupported content type "%s".', $resourceKey),
-                'hint' => \sprintf('Supported: %s.', \implode(', ', $this->extensionRegistry->resourceKeys())),
+                'hint' => \sprintf('Supported: %s.', \implode(', ', $this->extensionRegistry->searchableResourceKeys())),
             ];
         }
 
@@ -106,7 +107,7 @@ final class ContentSearch
                 'error' => \sprintf('Content search failed: %s', $e->getMessage()),
                 'hint' => \sprintf(
                     'Only published content is indexed. Verify the locale is correct and resourceKey is one of %s (or omit to search all).',
-                    \implode(', ', \array_map(static fn (string $key): string => \sprintf('"%s"', $key), $this->extensionRegistry->resourceKeys())),
+                    \implode(', ', \array_map(static fn (string $key): string => \sprintf('"%s"', $key), $this->extensionRegistry->searchableResourceKeys())),
                 ),
             ];
         }

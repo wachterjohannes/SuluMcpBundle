@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Sulu\Mcp\Application\Content;
 
 use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
+use Sulu\Mcp\Domain\Content\NotSearchableContentTypeInterface;
 
 /**
  * Collects every {@see ContentTypeExtensionInterface} tagged
@@ -78,5 +79,27 @@ final class ContentTypeExtensionRegistry
     public function all(): array
     {
         return \array_values($this->byResourceKey);
+    }
+
+    /**
+     * The extensions `sulu_content_search` and the preview tools work on: all but those marked
+     * {@see NotSearchableContentTypeInterface}.
+     *
+     * @return list<ContentTypeExtensionInterface>
+     */
+    public function searchable(): array
+    {
+        return \array_values(\array_filter(
+            $this->byResourceKey,
+            static fn (ContentTypeExtensionInterface $extension): bool => !$extension instanceof NotSearchableContentTypeInterface,
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function searchableResourceKeys(): array
+    {
+        return \array_map(static fn (ContentTypeExtensionInterface $extension): string => $extension->getResourceKey(), $this->searchable());
     }
 }

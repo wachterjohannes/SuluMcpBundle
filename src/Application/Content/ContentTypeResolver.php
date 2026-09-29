@@ -14,15 +14,12 @@ declare(strict_types=1);
 namespace Sulu\Mcp\Application\Content;
 
 use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
-use Sulu\Mcp\Infrastructure\Sulu\Content\SnippetContentTypeExtension;
-use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 
 /**
  * Resolves the content-type-specific parts of block and content operations (loading the
  * draft entity, building the right message) so the tools can be written once and dispatch over
- * a `resourceKey`: every {@see ContentTypeExtensionRegistry} extension (pages, articles, any
- * bundle's type) plus snippets, which are not in the registry because search and previews
- * do not cover them.
+ * a `resourceKey`: every {@see ContentTypeExtensionRegistry} extension (pages, articles, snippets,
+ * any bundle's type).
  *
  * Everything else (content resolve/normalize, block-tree manipulation) is already
  * type-agnostic and stays in the tools.
@@ -31,13 +28,9 @@ use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
  */
 final readonly class ContentTypeResolver
 {
-    private SnippetContentTypeExtension $snippetExtension;
-
     public function __construct(
-        SnippetRepositoryInterface $snippetRepository,
         private ContentTypeExtensionRegistry $extensionRegistry,
     ) {
-        $this->snippetExtension = new SnippetContentTypeExtension($snippetRepository);
     }
 
     public function supports(string $resourceKey): bool
@@ -50,7 +43,7 @@ final readonly class ContentTypeResolver
      */
     public function supportedResourceKeys(): array
     {
-        return [...$this->extensionRegistry->resourceKeys(), $this->snippetExtension->getResourceKey()];
+        return $this->extensionRegistry->resourceKeys();
     }
 
     /**
@@ -58,15 +51,11 @@ final readonly class ContentTypeResolver
      */
     public function all(): array
     {
-        return [...$this->extensionRegistry->all(), $this->snippetExtension];
+        return $this->extensionRegistry->all();
     }
 
     public function find(string $resourceKey): ?ContentTypeExtensionInterface
     {
-        if ($this->snippetExtension->getResourceKey() === $resourceKey) {
-            return $this->snippetExtension;
-        }
-
         return $this->extensionRegistry->find($resourceKey);
     }
 
