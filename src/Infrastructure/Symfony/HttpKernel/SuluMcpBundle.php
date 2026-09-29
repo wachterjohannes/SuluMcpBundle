@@ -190,6 +190,12 @@ class SuluMcpBundle extends AbstractBundle
         // is all it takes to keep them out of an installation without SuluProductBundle.
         if (self::isProductBundleLoaded($builder)) {
             $container->import(\dirname(__DIR__, 4) . '/config/services_product.php');
+
+            // These two wrap SuluProductBundle's own #[AsTool] services, which SuluProductBundle
+            // registers only under this same condition (SuluProductBundle.php:1324).
+            if (ContainerBuilder::willBeAvailable('symfony/ai-agent', AsTool::class, ['sulu/product-bundle'])) {
+                $container->import(\dirname(__DIR__, 4) . '/config/services_product_ai.php');
+            }
         }
     }
 

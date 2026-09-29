@@ -50,6 +50,7 @@ use Sulu\Mcp\UserInterface\Mcp\Tool\PingTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Preview\PreviewLinkGenerateTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Preview\PreviewLinkRevokeTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\AttributeListTool;
+use Sulu\Mcp\UserInterface\Mcp\Tool\Product\GetProductsTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductCreateTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductFamilyListTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductGetTool;
@@ -58,6 +59,7 @@ use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductUpdateTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductVariantCreateTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductVariantListTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Product\ProductVariantUpdateTool;
+use Sulu\Mcp\UserInterface\Mcp\Tool\Product\SearchProductsByAttributesTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Snippet\SnippetCreateTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Snippet\SnippetGetTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Snippet\SnippetListTool;
@@ -121,6 +123,8 @@ final class ToolPermissionGoldenTest extends TestCase
         ProductVariantUpdateTool::class => ['sulu_product_variant_update', [['sulu.product.products', PermissionTypes::EDIT]]],
         ProductFamilyListTool::class => ['sulu_product_family_list', [['sulu.product.product_families', PermissionTypes::VIEW]]],
         AttributeListTool::class => ['sulu_attribute_list', [['sulu.product.attributes', PermissionTypes::VIEW]]],
+        GetProductsTool::class => ['sulu_product_get_products', [['sulu.product.products', PermissionTypes::VIEW]]],
+        SearchProductsByAttributesTool::class => ['sulu_product_search_products_by_attributes', [['sulu.product.products', PermissionTypes::VIEW]]],
         SnippetCreateTool::class => ['sulu_snippet_create', [['sulu.snippet.snippets', PermissionTypes::EDIT], ['sulu.snippet.snippets', PermissionTypes::ADD]]],
         SnippetGetTool::class => ['sulu_snippet_get', [['sulu.snippet.snippets', PermissionTypes::VIEW]]],
         SnippetListTool::class => ['sulu_snippet_list', [['sulu.snippet.snippets', PermissionTypes::VIEW]]],
