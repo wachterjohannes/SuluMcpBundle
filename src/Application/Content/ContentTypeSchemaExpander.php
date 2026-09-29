@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Sulu\Mcp\Application\Content;
 
+use Mcp\Schema\Tool;
+
 /**
  * Fills the resourceKey placeholders of tool and resource metadata with the resourceKeys that
  * are registered at runtime. A description or an `enum` cannot list them statically, because a
@@ -21,7 +23,7 @@ namespace Sulu\Mcp\Application\Content;
  * Use {@see self::RESOURCE_KEYS} for tools working on the registered content types (search,
  * preview) and {@see self::CONTENT_RESOURCE_KEYS} for tools that also cover snippets.
  *
- * @phpstan-import-type ToolInputSchema from \Mcp\Schema\Tool
+ * @phpstan-import-type ToolInputSchema from Tool
  *
  * @internal
  */

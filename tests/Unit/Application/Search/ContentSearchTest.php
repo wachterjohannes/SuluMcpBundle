@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Sulu\Mcp\Tests\Unit\Application\Search;
 
+use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 use CmsIg\Seal\Adapter\SearcherInterface;
 use CmsIg\Seal\EngineInterface;
 use CmsIg\Seal\Schema\Field\IdentifierField;
@@ -79,7 +80,7 @@ final class ContentSearchTest extends TestCase
      * and a real ToolPermissionChecker driven by a mocked SecurityCheckerInterface.
      */
     /**
-     * @param list<\Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface> $extensions
+     * @param list<ContentTypeExtensionInterface> $extensions
      */
     private function registry(array $extensions = []): ContentTypeExtensionRegistry
     {
