@@ -22,12 +22,8 @@ use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 use Sulu\Mcp\Domain\Content\NotSearchableContentTypeInterface;
 
 /**
- * Keyword search over the `website` SEAL index, the logic behind the `sulu_content_search` MCP
- * tool.
- *
- * Whitelist, not blacklist: only the resourceKeys a {@see ContentTypeExtensionRegistry} extension
- * declares AND the caller may view are ever returned. An indexed resourceKey nobody registered
- * for MCP stays invisible, rather than leaking to anyone with webspace VIEW.
+ * Keyword search over the `website` index. A whitelist: an indexed resourceKey no extension
+ * registered stays invisible instead of leaking to anyone with webspace VIEW.
  *
  * @internal
  */
@@ -65,8 +61,7 @@ final class ContentSearch
             return ['results' => [], 'total' => 0, 'hint' => \sprintf('Webspace "%s" is not readable with your permissions.', $webspace)];
         }
 
-        // A type with no view contexts (pages) is governed by the webspace check above.
-        // Every other type carries its own security context and needs an extra check here.
+        // A type without view contexts (pages) is governed by the webspace check above.
         $visibleResourceKeys = [];
         foreach ($this->extensionRegistry->searchable() as $extension) {
             if ($this->canView($extension, $locale)) {
@@ -114,9 +109,7 @@ final class ContentSearch
     }
 
     /**
-     * The `website` index carries no template, so per-group filtering the way
-     * ArticleListTool does isn't possible here: VIEW on any one of an extension's
-     * contexts (e.g. one article group) is enough to see its results at all.
+     * The index carries no template, so VIEW on any one context (e.g. one article group) suffices.
      */
     private function canView(ContentTypeExtensionInterface $extension, string $locale): bool
     {

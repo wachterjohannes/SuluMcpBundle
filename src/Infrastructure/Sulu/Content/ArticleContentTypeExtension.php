@@ -23,10 +23,6 @@ use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 use Sulu\Mcp\Infrastructure\Sulu\Security\ArticleSecurityContextResolver;
 
 /**
- * Built-in extension for articles. Articles are secured per template group, so the entity
- * context comes from the resolved content's template key and VIEW on any group's context
- * makes the type visible.
- *
  * @internal
  */
 final readonly class ArticleContentTypeExtension implements ContentTypeExtensionInterface
@@ -96,9 +92,7 @@ final readonly class ArticleContentTypeExtension implements ContentTypeExtension
     }
 
     /**
-     * Dimension contents are hydrated for draft *and* live: the handler re-queries this same
-     * instance from the identity map, and Doctrine leaves an initialized collection alone, so a
-     * draft-only aggregate duplicates the live rows.
+     * Hydrated for draft and live: a draft-only aggregate duplicates the live rows on re-query.
      */
     public function loadForTransition(string $uuid, string $locale): ?object
     {

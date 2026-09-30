@@ -16,10 +16,6 @@ namespace Sulu\Mcp\Tests\Unit\Fixture;
 use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 
 /**
- * A minimal ContentTypeExtensionInterface implementation, standing in for a
- * bundle like SuluProductBundle in tests that must prove the extension point
- * works without depending on a real one.
- *
  * @internal
  */
 final class FakeContentTypeExtension implements ContentTypeExtensionInterface

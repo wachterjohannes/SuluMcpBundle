@@ -23,9 +23,6 @@ use Sulu\Snippet\Application\Message\RemoveSnippetMessage;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 
 /**
- * Built-in extension for snippets. Snippets are not part of the `website` search index and have no
- * preview, hence {@see NotSearchableContentTypeInterface}.
- *
  * @internal
  */
 final readonly class SnippetContentTypeExtension implements ContentTypeExtensionInterface, NotSearchableContentTypeInterface
@@ -96,9 +93,7 @@ final readonly class SnippetContentTypeExtension implements ContentTypeExtension
     }
 
     /**
-     * Dimension contents are hydrated for draft *and* live: the handler re-queries this same
-     * instance from the identity map, and Doctrine leaves an initialized collection alone, so a
-     * draft-only aggregate duplicates the live rows.
+     * Hydrated for draft and live: a draft-only aggregate duplicates the live rows on re-query.
      */
     public function loadForTransition(string $uuid, string $locale): ?object
     {

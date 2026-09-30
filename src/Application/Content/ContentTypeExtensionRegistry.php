@@ -17,18 +17,12 @@ use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 use Sulu\Mcp\Domain\Content\NotSearchableContentTypeInterface;
 
 /**
- * Collects every {@see ContentTypeExtensionInterface} tagged
- * `sulu_mcp.content_type_extension`, keyed by resourceKey.
- *
  * @internal
  */
 final class ContentTypeExtensionRegistry
 {
     /**
-     * Sentinel candidate context: grants access if the caller has VIEW on ANY
-     * registered extension's security contexts. Mirrors
-     * WebspacePermissionResolver::ANY_WEBSPACE_CONTEXT and
-     * ArticleSecurityContextResolver::ANY_ARTICLE_GROUP_CONTEXT.
+     * Grants access if the caller has VIEW on any registered extension's security contexts.
      */
     public const ANY_EXTENSION_CONTEXT = 'sulu.mcp.content_type_extension.#any#';
 
@@ -82,9 +76,6 @@ final class ContentTypeExtensionRegistry
     }
 
     /**
-     * The extensions `sulu_content_search` and the preview tools work on: all but those marked
-     * {@see NotSearchableContentTypeInterface}.
-     *
      * @return list<ContentTypeExtensionInterface>
      */
     public function searchable(): array

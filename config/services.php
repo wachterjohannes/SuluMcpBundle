@@ -160,13 +160,10 @@ return static function(ContainerConfigurator $container): void {
     $services->alias(ToolPermissionCheckerInterface::class, ToolPermissionChecker::class);
     $services->set(WebspacePermissionResolver::class);
 
-    // Pages, articles and snippets are extensions like any other, tagged by the instanceof rule above.
     $services->set(PageContentTypeExtension::class);
     $services->set(ArticleContentTypeExtension::class);
     $services->set(SnippetContentTypeExtension::class);
 
-    // Collects every ContentTypeExtensionInterface tagged service, however it got tagged
-    // (autoconfigured here, or tagged explicitly by a bundle wiring its own services file).
     $services->set(ContentTypeExtensionRegistry::class)
         ->arg('$extensions', tagged_iterator('sulu_mcp.content_type_extension'));
 
@@ -310,7 +307,7 @@ return static function(ContainerConfigurator $container): void {
     $services->set(PageMoveTool::class);
     $services->set(PageReorderTool::class);
 
-    // Unified content tools (any registered resourceKey via `resourceKey`)
+    // Unified content tools
     $services->set(ContentDeleteTool::class);
     $services->set(ContentPublishTool::class);
     $services->set(ContentUnpublishTool::class);

@@ -20,10 +20,6 @@ use Sulu\Content\Domain\Model\TemplateInterface;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
 
 /**
- * Security context for a loaded content entity, asked from its content type extension:
- * a page is secured by its webspace, an article per template group (from the RESOLVED dimension
- * content's template key, NOT the aggregate), a snippet and any registered type by its own context.
- *
  * @internal
  */
 final readonly class ContentSecurityContextResolver

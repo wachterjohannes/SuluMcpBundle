@@ -16,14 +16,6 @@ namespace Sulu\Mcp\Application\Content;
 use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 
 /**
- * Resolves the content-type-specific parts of block and content operations (loading the
- * draft entity, building the right message) so the tools can be written once and dispatch over
- * a `resourceKey`: every {@see ContentTypeExtensionRegistry} extension (pages, articles, snippets,
- * any bundle's type).
- *
- * Everything else (content resolve/normalize, block-tree manipulation) is already
- * type-agnostic and stays in the tools.
- *
  * @internal
  */
 final readonly class ContentTypeResolver
@@ -69,12 +61,7 @@ final readonly class ContentTypeResolver
     }
 
     /**
-     * Load the draft aggregate for the given resourceKey, or null when it is unsupported or no
-     * matching entity exists.
-     *
-     * $loadGhost also matches an entity in a locale it has no content in. It is opt-in:
-     * the returned aggregate spans every locale, so a caller that does not check for a
-     * missing translation with ContentLocaleTrait would act on all of them.
+     * $loadGhost is opt-in: the aggregate then spans every locale, so check ContentLocaleTrait first.
      */
     public function loadDraft(string $resourceKey, string $uuid, string $locale, bool $loadGhost = false): ?object
     {
@@ -103,7 +90,7 @@ final readonly class ContentTypeResolver
     }
 
     /**
-     * `forceRemoveChildren` only affects pages (which can have a subtree).
+     * `forceRemoveChildren` only affects pages.
      */
     public function createRemoveMessage(string $resourceKey, string $uuid, string $locale, bool $forceRemoveChildren = false): object
     {

@@ -25,9 +25,6 @@ use Sulu\Page\Domain\Model\PageInterface;
 use Sulu\Page\Domain\Repository\PageRepositoryInterface;
 
 /**
- * Built-in extension for pages. A page is secured by its webspace, so VIEW is not checked
- * per context here and the entity context comes from the aggregate.
- *
  * @internal
  */
 final readonly class PageContentTypeExtension implements ContentTypeExtensionInterface
@@ -98,9 +95,7 @@ final readonly class PageContentTypeExtension implements ContentTypeExtensionInt
     }
 
     /**
-     * Dimension contents are hydrated for draft *and* live: the handler re-queries this same
-     * instance from the identity map, and Doctrine leaves an initialized collection alone, so a
-     * draft-only aggregate duplicates the live rows.
+     * Hydrated for draft and live: a draft-only aggregate duplicates the live rows on re-query.
      */
     public function loadForTransition(string $uuid, string $locale): ?object
     {

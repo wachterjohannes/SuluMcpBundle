@@ -176,10 +176,6 @@ final readonly class PermissionAwareCallToolHandler implements RequestHandlerInt
         return false;
     }
 
-    /**
-     * Expands the extension sentinel, so a user holding VIEW on any one
-     * registered content type extension still passes.
-     */
     private function anyExtensionGrants(string $permission, ?string $locale): bool
     {
         foreach ($this->extensionRegistry->searchable() as $extension) {

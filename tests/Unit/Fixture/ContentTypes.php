@@ -33,15 +33,12 @@ use Sulu\Page\Domain\Repository\PageRepositoryInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 
 /**
- * Builds the real content type resolvers over test doubles: pages, articles and snippets are built-in
- * extensions, so tools are tested against them rather than against stand-ins.
- *
  * @internal
  */
 final class ContentTypes
 {
     /**
-     * @param list<ContentTypeExtensionInterface> $extensions further registered extensions
+     * @param list<ContentTypeExtensionInterface> $extensions
      */
     public static function resolver(
         PageRepositoryInterface $pageRepository,
@@ -55,7 +52,7 @@ final class ContentTypes
     }
 
     /**
-     * @param list<ContentTypeExtensionInterface> $extensions further registered extensions
+     * @param list<ContentTypeExtensionInterface> $extensions
      */
     public static function registry(
         PageRepositoryInterface $pageRepository,
@@ -74,10 +71,7 @@ final class ContentTypes
     }
 
     /**
-     * Resolver for tests that never load an entity: the built-in extensions are built over inert
-     * repository doubles.
-     *
-     * @param list<ContentTypeExtensionInterface> $extensions further registered extensions
+     * @param list<ContentTypeExtensionInterface> $extensions
      */
     public static function inertResolver(array $extensions = [], GroupProviderInterface|ArticleSecurityContextResolver|null $groupProvider = null): ContentTypeResolver
     {
@@ -94,10 +88,7 @@ final class ContentTypes
     }
 
     /**
-     * Security resolver for tests that never load an entity: the built-in extensions are
-     * built over inert repository doubles.
-     *
-     * @param list<ContentTypeExtensionInterface> $extensions further registered extensions
+     * @param list<ContentTypeExtensionInterface> $extensions
      */
     public static function securityResolver(ContentManagerInterface $contentManager, GroupProviderInterface|ArticleSecurityContextResolver|null $groupProvider = null, array $extensions = []): ContentSecurityContextResolver
     {

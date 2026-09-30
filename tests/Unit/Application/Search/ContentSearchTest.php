@@ -69,9 +69,6 @@ final class ContentSearchTest extends TestCase
         $this->searcher = $this->prophesize(SearcherInterface::class);
         $this->permissionChecker = $this->prophesize(ToolPermissionCheckerInterface::class);
         $this->permissionChecker->has('sulu.article.articles', PermissionTypes::VIEW, 'en')->willReturn(true);
-        // Grants EDIT on 'example' so existing happy-path tests are unaffected by the webspace filter.
-        // No extensions registered by default, so $permissionChecker->has() is never reached
-        // (the extension loop is empty) and needs no stub.
         $this->contentSearch = new ContentSearch(new WebsiteSearch($this->engine->reveal()), $this->webspaceResolver(['example']), $this->permissionChecker->reveal(), $this->registry());
     }
 
@@ -375,8 +372,6 @@ final class ContentSearchTest extends TestCase
 
     public function testTypeForAnUnregisteredResourceKeyIsRejected(): void
     {
-        // No extension registered (default $this->contentSearch), so "widgets" is
-        // neither a builtin nor a known extension resourceKey.
         $this->engine->createSearchBuilder(Argument::cetera())->shouldNotBeCalled();
 
         $result = $this->contentSearch->search('hello', 'en', null, 'widgets');

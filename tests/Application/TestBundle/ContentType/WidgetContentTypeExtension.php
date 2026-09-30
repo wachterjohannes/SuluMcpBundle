@@ -16,9 +16,7 @@ namespace Sulu\Mcp\Tests\Application\TestBundle\ContentType;
 use Sulu\Mcp\Domain\Content\ContentTypeExtensionInterface;
 
 /**
- * Stands in for a bundle like SuluProductBundle, proving the extension point works
- * end to end (container wiring, tagging, discovery) without SuluMcpBundle depending
- * on a real one. Deliberately named "widgets", not "products".
+ * Stands in for a bundle like SuluProductBundle, deliberately named "widgets".
  */
 final class WidgetContentTypeExtension implements ContentTypeExtensionInterface
 {

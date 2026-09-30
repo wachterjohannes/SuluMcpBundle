@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace Sulu\Mcp\Domain\Content;
 
 /**
- * Marks a {@see ContentTypeExtensionInterface} whose content is not part of the `website` search
- * index and has no preview. The unified content and block tools still work on it, but
- * `sulu_content_search` and the preview tools neither accept nor list its resourceKey.
+ * Keeps a content type out of `sulu_content_search` and the preview tools.
  */
 interface NotSearchableContentTypeInterface
 {
