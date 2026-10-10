@@ -36,6 +36,7 @@ class WellKnownController
         private readonly string $serverUrl,
         private readonly string $mcpPath = '/admin/mcp',
         private readonly array $scopes = ['mcp:tools', 'mcp:resources'],
+        private readonly bool $cimdEnabled = true,
     ) {
     }
 
@@ -65,6 +66,7 @@ class WellKnownController
             'token_endpoint_auth_methods_supported' => ['client_secret_post', 'client_secret_basic', 'none'],
             'scopes_supported' => $this->scopes,
             'registration_endpoint' => $base . $this->routePath('sulu_mcp_client_registration'),
+            'client_id_metadata_document_supported' => $this->cimdEnabled,
         ]);
     }
 

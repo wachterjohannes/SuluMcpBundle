@@ -24,6 +24,8 @@ use Sulu\Mcp\Application\Content\ContentTypeExtensionRegistry;
 use Sulu\Mcp\Application\Content\ContentTypeResolver;
 use Sulu\Mcp\Application\Content\ContentTypeSchemaExpander;
 use Sulu\Mcp\Application\Media\MediaDownloader;
+use Sulu\Mcp\Application\OAuth\ClientMetadataFetcher;
+use Sulu\Mcp\Application\OAuth\ClientMetadataValidator;
 use Sulu\Mcp\Application\Media\MediaFileNamer;
 use Sulu\Mcp\Application\Media\MediaSourceUrlResolver;
 use Sulu\Mcp\Application\Metadata\ExtensionFieldsProvider;
@@ -40,6 +42,7 @@ use Sulu\Mcp\Application\Security\ToolPermissionCheckerInterface;
 use Sulu\Mcp\Application\Security\ToolVisibilityResolver;
 use Sulu\Mcp\Application\Security\WebspacePermissionResolver;
 use Sulu\Mcp\Infrastructure\League\EventListener\OAuthAuthorizationListener;
+use Sulu\Mcp\Infrastructure\League\Manager\CimdClientManager;
 use Sulu\Mcp\Infrastructure\Mcp\FilteredRegistry;
 use Sulu\Mcp\Infrastructure\Mcp\PermissionAwareCallToolHandler;
 use Sulu\Mcp\Infrastructure\Sulu\Admin\OAuthConsentAdmin;
@@ -114,6 +117,8 @@ use Sulu\Mcp\UserInterface\Mcp\Tool\Taxonomy\TagDeleteTool;
 use Sulu\Mcp\UserInterface\Mcp\Tool\Taxonomy\TagListTool;
 use Sulu\Page\Domain\Repository\NavigationRepositoryInterface;
 use Symfony\Component\DependencyInjection\Reference;
+use League\Bundle\OAuth2ServerBundle\Manager\ClientManagerInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\NoPrivateNetworkHttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -239,12 +244,32 @@ return static function(ContainerConfigurator $container): void {
         ->arg('$serverUrl', '%sulu_mcp.server_url%')
         ->arg('$mcpPath', '%sulu_mcp.mcp_path%')
         ->arg('$scopes', '%sulu_mcp.oauth.scopes%')
+        ->arg('$cimdEnabled', '%sulu_mcp.cimd.enabled%')
         ->tag('controller.service_arguments');
 
     $services->set(DynamicClientRegistrationController::class)
         ->arg('$clientSecretHasher', new Reference('league.oauth2_server.password_hasher'))
         ->arg('$allowedScopes', '%sulu_mcp.oauth.scopes%')
         ->tag('controller.service_arguments');
+
+    // Client ID Metadata Documents. The client is as exposed as MediaDownloader's: it fetches a
+    // URL a stranger chose, so it is built the same way, and ClientMetadataFetcher pins the
+    // address it checked on top of that.
+    $services->set('sulu_mcp.cimd.http_client', NoPrivateNetworkHttpClient::class)
+        ->arg('$client', inline_service(HttpClientInterface::class)->factory([HttpClient::class, 'create']));
+
+    $services->set(ClientMetadataFetcher::class)
+        ->arg('$httpClient', new Reference('sulu_mcp.cimd.http_client'));
+
+    $services->set(ClientMetadataValidator::class);
+
+    $services->set(CimdClientManager::class)
+        ->decorate(ClientManagerInterface::class)
+        ->arg('$inner', new Reference('.inner'))
+        ->arg('$cache', new Reference('cache.app'))
+        ->arg('$scopes', '%sulu_mcp.oauth.scopes%')
+        ->arg('$enabled', '%sulu_mcp.cimd.enabled%')
+        ->arg('$logger', new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE));
 
     $services->set(OAuthConsentStore::class);
 
