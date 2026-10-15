@@ -113,6 +113,57 @@ final class SuluMcpBundleTest extends TestCase
         self::assertSame(['mcp:tools', 'mcp:resources'], $container->getParameter('sulu_mcp.oauth.scopes'));
         self::assertSame([], $container->getParameter('sulu_mcp.dangerous_tools'));
         self::assertSame([], $container->getParameter('sulu_mcp.media_upload.allowed_hosts'));
+        self::assertSame(['claude.ai', 'chatgpt.com'], $container->getParameter('sulu_mcp.cimd.trusted_hosts'));
+    }
+
+    public function testTrustedHostsReplaceTheDefaultsAndAreLowercased(): void
+    {
+        $container = $this->container();
+
+        $extension = (new SuluMcpBundle())->getContainerExtension();
+        self::assertNotNull($extension);
+
+        $extension->load([['server_url' => 'https://sulu.example.com', 'client_id_metadata_documents' => ['trusted_hosts' => ['Example.COM']]]], $container);
+
+        self::assertSame(['example.com'], $container->getParameter('sulu_mcp.cimd.trusted_hosts'));
+    }
+
+    public function testAnEmptyTrustedHostsListOptsOutOfTheDefaults(): void
+    {
+        $container = $this->container();
+
+        $extension = (new SuluMcpBundle())->getContainerExtension();
+        self::assertNotNull($extension);
+
+        $extension->load([['server_url' => 'https://sulu.example.com', 'client_id_metadata_documents' => ['trusted_hosts' => []]]], $container);
+
+        self::assertSame([], $container->getParameter('sulu_mcp.cimd.trusted_hosts'));
+    }
+
+    #[DataProvider('provideInvalidTrustedHosts')]
+    public function testRejectsTrustedHostsThatAreNotBareHostNames(string $host): void
+    {
+        $container = $this->container();
+
+        $extension = (new SuluMcpBundle())->getContainerExtension();
+        self::assertNotNull($extension);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessageMatches('/bare host names/');
+
+        $extension->load([['server_url' => 'https://sulu.example.com', 'client_id_metadata_documents' => ['trusted_hosts' => [$host]]]], $container);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function provideInvalidTrustedHosts(): iterable
+    {
+        yield 'with scheme' => ['https://claude.ai'];
+        yield 'with path' => ['claude.ai/oauth'];
+        yield 'with port' => ['claude.ai:443'];
+        yield 'with wildcard' => ['*.claude.ai'];
+        yield 'empty' => [''];
     }
 
     public function testLoadLowercasesTheAllowedHosts(): void
